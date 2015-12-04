@@ -174,18 +174,18 @@ kEvolveBombardCost = 5
 
 kGorgeCost = 8
 kGorgeEggCost = 15
-kLerkCost = 20
+kLerkCost = 15
 kLerkEggCost = 30
-kFadeCost = 35
+kFadeCost = 25
 kFadeEggCost = 70
 kOnosCost = 55
 kOnosEggCost = 100
 
-kSkulkUpgradeCost = 0
-kGorgeUpgradeCost = 1
-kLerkUpgradeCost = 3
-kFadeUpgradeCost = 5
-kOnosUpgradeCost = 8
+kSkulkUpgradeCost = 7
+kGorgeUpgradeCost = 7
+kLerkUpgradeCost = 7
+kFadeUpgradeCost = 7
+kOnosUpgradeCost = 7
 
 kHydraCost = 3
 kClogCost = 0
@@ -202,7 +202,7 @@ kSilenceCost = 0
 kAdrenalineCost = 0
 kCelerityCost = 0
 
-kPlayingTeamInitialTeamRes = 0
+kPlayingTeamInitialTeamRes = 15
 kMaxTeamResources = 40000
 
 kMarineInitialIndivRes = 0
@@ -551,11 +551,11 @@ kEvolveHallucinationsResearchTime = 30
 kHydraBuildTime = 13
 kCystBuildTime = 5
 
-kSkulkGestateTime = 3
-kGorgeGestateTime = 7
-kLerkGestateTime = 15
-kFadeGestateTime = 25
-kOnosGestateTime = 30
+kSkulkGestateTime = 1
+kGorgeGestateTime = 2
+kLerkGestateTime = 3
+kFadeGestateTime = 4
+kOnosGestateTime = 5
 
 kEggGestateTime = 45
 

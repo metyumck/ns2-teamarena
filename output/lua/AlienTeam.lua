@@ -835,12 +835,12 @@ function AlienTeam:InitTechTree()
     self.techTree:AddSpecial(kTechId.ThreeSpurs, kTechId.TwoSpurs)
     
     // personal upgrades (all alien types)
-    self.techTree:AddBuyNode(kTechId.Carapace, kTechId.Shell, kTechId.None, kTechId.AllAliens)    
-    self.techTree:AddBuyNode(kTechId.Regeneration, kTechId.Shell, kTechId.None, kTechId.AllAliens)
-    self.techTree:AddBuyNode(kTechId.Aura, kTechId.Veil, kTechId.None, kTechId.AllAliens)
-    self.techTree:AddBuyNode(kTechId.Phantom, kTechId.Veil, kTechId.None, kTechId.AllAliens)
-    self.techTree:AddBuyNode(kTechId.Celerity, kTechId.Spur, kTechId.None, kTechId.AllAliens)  
-    self.techTree:AddBuyNode(kTechId.Adrenaline, kTechId.Spur, kTechId.None, kTechId.AllAliens)  
+    self.techTree:AddBuyNode(kTechId.Carapace, kTechId.None, kTechId.None, kTechId.AllAliens)    
+    self.techTree:AddBuyNode(kTechId.Regeneration, kTechId.None, kTechId.None, kTechId.AllAliens)
+    self.techTree:AddBuyNode(kTechId.Aura, kTechId.None, kTechId.None, kTechId.AllAliens)
+    self.techTree:AddBuyNode(kTechId.Phantom, kTechId.None, kTechId.None, kTechId.AllAliens)
+    self.techTree:AddBuyNode(kTechId.Celerity, kTechId.None, kTechId.None, kTechId.AllAliens)  
+    self.techTree:AddBuyNode(kTechId.Adrenaline, kTechId.None, kTechId.None, kTechId.AllAliens)  
 
     // Crag
     self.techTree:AddPassive(kTechId.CragHeal)

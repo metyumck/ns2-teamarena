@@ -340,9 +340,9 @@ function MarineTeam:InitTechTree()
     
     // arms lab upgrades
     
-    self.techTree:AddResearchNode(kTechId.Armor1,                 kTechId.ArmsLab)
-    self.techTree:AddResearchNode(kTechId.Armor2,                 kTechId.Armor1, kTechId.None)
-    self.techTree:AddResearchNode(kTechId.Armor3,                 kTechId.Armor2, kTechId.None)    
+    self.techTree:AddTargetedBuyNode(kTechId.Armor1,                 kTechId.None)
+    self.techTree:AddTargetedBuyNode(kTechId.Armor2,                 kTechId.None, kTechId.None)
+    self.techTree:AddTargetedBuyNode(kTechId.Armor3,                 kTechId.None, kTechId.None)    
     self.techTree:AddResearchNode(kTechId.NanoArmor,              kTechId.None)
     
     self.techTree:AddResearchNode(kTechId.Weapons1,               kTechId.ArmsLab)
@@ -366,7 +366,7 @@ function MarineTeam:InitTechTree()
     self.techTree:AddActivation(kTechId.DoorUnlock)
     
     // Weapon-specific
-    self.techTree:AddResearchNode(kTechId.ShotgunTech,           kTechId.Armory,              kTechId.None)
+    self.techTree:AddResearchNode(kTechId.ShotgunTech,           kTechId.None,              kTechId.None)
     self.techTree:AddTargetedBuyNode(kTechId.Shotgun,            kTechId.None,         kTechId.None)
     self.techTree:AddTargetedActivation(kTechId.DropShotgun,     kTechId.None,         kTechId.None)
     
@@ -376,15 +376,15 @@ function MarineTeam:InitTechTree()
     self.techTree:AddTargetedActivation(kTechId.DropGrenadeLauncher,  kTechId.AdvancedWeaponry)
     
     self.techTree:AddResearchNode(kTechId.GrenadeTech,           kTechId.Armory,                   kTechId.None)
-    self.techTree:AddTargetedBuyNode(kTechId.ClusterGrenade,     kTechId.GrenadeTech)
-    self.techTree:AddTargetedBuyNode(kTechId.GasGrenade,         kTechId.GrenadeTech)
-    self.techTree:AddTargetedBuyNode(kTechId.PulseGrenade,       kTechId.GrenadeTech)
+    self.techTree:AddTargetedBuyNode(kTechId.ClusterGrenade,     kTechId.None)
+    self.techTree:AddTargetedBuyNode(kTechId.GasGrenade,         kTechId.None)
+    self.techTree:AddTargetedBuyNode(kTechId.PulseGrenade,       kTechId.None)
     
     self.techTree:AddTargetedBuyNode(kTechId.Flamethrower,     kTechId.AdvancedWeaponry)
     self.techTree:AddTargetedActivation(kTechId.DropFlamethrower,    kTechId.AdvancedWeaponry)
     
     self.techTree:AddResearchNode(kTechId.MinesTech,            kTechId.Armory,           kTechId.None)
-    self.techTree:AddTargetedBuyNode(kTechId.LayMines,          kTechId.MinesTech,        kTechId.None)
+    self.techTree:AddTargetedBuyNode(kTechId.LayMines,          kTechId.None,        kTechId.None)
     self.techTree:AddTargetedActivation(kTechId.DropMines,      kTechId.MinesTech,        kTechId.None)
     
     self.techTree:AddTargetedBuyNode(kTechId.Welder,          kTechId.None,        kTechId.None)

@@ -428,7 +428,8 @@ function GUIMarineBuyMenu:_InitializeItemButtons()
         kTechId.Welder,
         kTechId.ClusterGrenade,
         kTechId.GasGrenade,
-        kTechId.PulseGrenade
+        kTechId.PulseGrenade,
+        kTechId.Armor1
     }
     local selectorPosX = -GUIMarineBuyMenu.kSelectorSize.x + GUIMarineBuyMenu.kPadding
     local fontScaleVector = GUIScale(Vector(0.8, 0.8, 0))
