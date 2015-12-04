@@ -1,0 +1,6 @@
+name        = "TeamArena"
+source_dir  = "source/"
+output_dir  = "output/"
+description = [=[]=]
+image       = "preview.jpg"
+publish_id = "21c0772b"

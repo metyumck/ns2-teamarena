@@ -1,0 +1,7 @@
+modEntry = [[
+Client: lua/TeamArenaClient.lua,
+Server: lua/TeamArenaServer.lua,
+Predict: lua/TeamArenaPredict.lua,
+Shared: lua/TeamArenaShared.lua,
+Priority: 5
+]]
