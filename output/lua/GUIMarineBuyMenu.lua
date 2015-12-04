@@ -798,10 +798,11 @@ function GUIMarineBuyMenu:_GetResearchInfo(techId)
 end
 
 local function HandleItemClicked(self, mouseX, mouseY)
-
+    
     if self.itemButtons then
-        for i = 1, #self.itemButtons do
         
+        for i = 1, #self.itemButtons do
+            
             local item = self.itemButtons[i]
             if GetIsMouseOver(self, item.Button) then
             

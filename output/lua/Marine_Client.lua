@@ -374,7 +374,7 @@ function Marine:BuyMenu()
         if not self.buyMenu then
         
             self.buyMenu = GetGUIManager():CreateGUIScript("GUIMarineBuyMenu")
-            
+            MouseTracker_SetIsVisible(true, "ui/Cursor_MenuDefault.dds", true)
             //MarineUI_SetHostStructure(structure)
             
             if structure then

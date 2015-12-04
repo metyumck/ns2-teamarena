@@ -36,7 +36,7 @@ local kRoundLimit = 13
 local kRoundRecord = {}
 local kMarineWins = 0
 local kAlienWins = 0
-local kBuyTimeLength = 10
+local kBuyTimeLength = 15
 
 for i=0, kRoundLimit - 1 do
    kRoundRecord[i] = 0
@@ -400,7 +400,7 @@ if Server then
     end
     
     function NS2Gamerules:BeginNewRound()
-        kBuyTimeLength = 5
+        kBuyTimeLength = 15
         self.team1:ReplaceRespawnAllPlayers()
         self.team2:ReplaceRespawnAllPlayers()
         self.team1:SetTeamResources(self.team1:GetTeamResources() + 59)
@@ -1092,6 +1092,7 @@ if Server then
             
                 self:CheckGameStart()
                 self:CheckRoundEnd()
+                self:CheckGameEnd()
                 
                 self:UpdateBuyTime(timePassed)
                 self:UpdatePregame(timePassed)
@@ -1504,6 +1505,8 @@ if Server then
             
                 if self:GetGameState() == kGameState.NotStarted then
                     self:SetGameState(kGameState.PreGame)
+                    self.kMarineWins = 0
+                    self.kAlienWins = 0
                     self.team1:SetTeamResources(60)
                     self.team2:SetTeamResources(60)
                     self.team1:AssignResources()
@@ -1591,7 +1594,7 @@ if Server then
         return false, false
         
     end
-    // TODO: This function has unnecessary repeated code, fix it up!
+    
     function NS2Gamerules:CheckRoundEnd()
         if self:GetGameStarted() and not Shared.GetCheatsEnabled() then
             
@@ -1609,7 +1612,7 @@ if Server then
                 kRoundCount = kRoundCount + 1
                 kAlienWins = kAlienWins + 1
                 self.gameInfo:SetAlienWins(kAlienWins)
-                if winConditionMet ~= "1" or "2" then
+                if winConditionMet ~= "1" or winConditionMet ~= "2" then
                     self:BeginNewRound()
                 end
                 
@@ -1620,7 +1623,7 @@ if Server then
                 kMarineWins = kMarineWins + 1
                 
                 self.gameInfo:SetMarineWins(kMarineWins)
-                if winConditionMet ~= "1" or "2" then
+                if winConditionMet ~= "1" or winConditionMet ~= "2" then
                     self:BeginNewRound()
                 end
             end
@@ -1643,60 +1646,35 @@ if Server then
         PROFILE("NS2Gamerules:CheckGameEnd")
         
         if self:GetGameStarted() and self.timeGameEnded == nil and not Shared.GetCheatsEnabled() and not self.preventGameEnd then
-
-            local time = Shared.GetTime()
-            if not self.timeDrawWindowEnds or time < self.timeDrawWindowEnds then
-
-                local team1Lost = self.team1Lost or self.team1:GetHasTeamLost()
-                local team2Lost = self.team2Lost or self.team2:GetHasTeamLost()
-
-                if team1Lost or team2Lost then
             
-                    -- After a team has entered a loss condition, they can not recover
-                    self.team1Lost = team1Lost
-                    self.team2Lost = team2Lost
-
-                    -- Continue checking for a draw for kDrawGameWindow seconds
-                    if not self.timeDrawWindowEnds then
-                        self.timeDrawWindowEnds = time + kDrawGameWindow
-                    end
-                    
-                else
-                    -- Check for auto-concede if neither team lost.
-                    if not self.timeNextAutoConcedeCheck or self.timeNextAutoConcedeCheck < time then
-                        
-                        team1Lost, team2Lost = CheckAutoConcede(self)
-                        if team2Lost then
-                            self:EndGame( self.team1 )
-                        elseif team1Lost then
-                            self:EndGame( self.team2 )
-                        end
-                        
-                        self.timeNextAutoConcedeCheck = time + kGameEndAutoConcedeCheckInterval
-                    end
-                    
-                end
-
-            else
-
-                if self.team2Lost and self.team1Lost then
-                    
-                    -- It's a draw
-                    self:DrawGame()
-                    
-                elseif self.team2Lost then
-
-                    -- Still no draw after kDrawGameWindow, count the win
-                    self:EndGame( self.team1 )
-
-                elseif self.team1Lost then
-
-                    -- Still no draw after kDrawGameWindow, count the win
-                    self:EndGame( self.team2 )
-                    
-                end
-
+            if self.team1:GetNumPlayers() < 1 then
+            
+                self.team1Lost = true
+                
+            elseif self.team2:GetNumPlayers() < 1 then
+            
+                self.team2Lost = true
+                
             end
+ 
+            if self.team2Lost and self.team1Lost then
+                    
+                -- It's a draw
+                self:DrawGame()
+                    
+            elseif self.team2Lost then
+
+                -- Still no draw after kDrawGameWindow, count the win
+                self:EndGame( self.team1 )
+
+            elseif self.team1Lost then
+
+                -- Still no draw after kDrawGameWindow, count the win
+                self:EndGame( self.team2 )
+                    
+            end
+
+            
 
         end
 
@@ -1748,7 +1726,7 @@ if Server then
             
             local buyTimeSeconds = math.ceil(self.buytime)
             
-            if self.lastBuyTimePlayed ~= buyTimeSeconds and (buyTimeSeconds < 5) then
+            if self.lastBuyTimePlayed ~= buyTimeSeconds and (buyTimeSeconds < kBuyTimeLength) then
                 
                 self.lastBuyTimePlayed = buyTimeSeconds
                 Server.SendNetworkMessage("Chat", BuildChatMessage(false, "Team Arena Bot", -1, kTeamReadyRoom, kNeutralTeamType, "Buy time remaining: " .. (buyTimeSeconds + 1) .. " seconds." ), true)
@@ -1762,8 +1740,8 @@ if Server then
                 self.team2:PlayPrivateTeamSound(ConditionalValue(self.team2:GetTeamType() == kAlienTeamType, NS2Gamerules.kAlienStartSound, NS2Gamerules.kMarineStartSound))
                 
                 self:SetGameState(kGameState.Started)
-                //reset buy time to 20 for next round
-                self.buytime = 5
+                //reset buy time to 15 for next round
+                self.buytime = 15
             end
         end
     end
@@ -1941,7 +1919,7 @@ if Server then
 end
 
 function NS2Gamerules:GetGameStartTime()
-    return ConditionalValue(self:GetGameStarted(), self.gameStartTime, 0)
+    return ConditionalValue(self:GetGameStarted(), 0, 0)
 end
 
 function NS2Gamerules:GetGameStarted()

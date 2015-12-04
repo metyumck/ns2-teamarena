@@ -309,11 +309,7 @@ function Marine:AttemptToBuy(techIds)
 
     local techId = techIds[1]
     
-    local hostStructure = GetHostStructureFor(self, techId)
-
-    if hostStructure then
-    
-        local mapName = LookupTechData(techId, kTechDataMapName)
+    local mapName = LookupTechData(techId, kTechDataMapName)
         
         if mapName then
         
@@ -347,7 +343,7 @@ function Marine:AttemptToBuy(techIds)
             
         end
         
-    end
+        
     
     return false
     
