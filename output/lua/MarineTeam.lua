@@ -265,8 +265,10 @@ function MarineTeam:Update(timePassed)
     
     
     for index, player in ipairs(GetEntitiesForTeam("Player", self:GetTeamNumber())) do
-        local armorLevel = player:GetArmorLevel()
-        player:UpdateArmorAmount(armorLevel)
+        if self:GetTeamNumber() == 1 and player:GetIsAlive() then
+            local armorLevel = player:GetArmorLevel()
+            player:UpdateArmorAmount(armorLevel)
+        end
     end
     
     
@@ -342,13 +344,13 @@ function MarineTeam:InitTechTree()
     // arms lab upgrades
     
     self.techTree:AddResearchNode(kTechId.Armor1,                 kTechId.None)
-    self.techTree:AddTargetedBuyNode(kTechId.Armor2,                 kTechId.None, kTechId.None)
-    self.techTree:AddTargetedBuyNode(kTechId.Armor3,                 kTechId.None, kTechId.None)    
+    self.techTree:AddResearchNode(kTechId.Armor2,                 kTechId.None, kTechId.None)
+    self.techTree:AddResearchNode(kTechId.Armor3,                 kTechId.None, kTechId.None)    
     self.techTree:AddResearchNode(kTechId.NanoArmor,              kTechId.None)
     
-    self.techTree:AddResearchNode(kTechId.Weapons1,               kTechId.ArmsLab)
-    self.techTree:AddResearchNode(kTechId.Weapons2,               kTechId.Weapons1, kTechId.None)
-    self.techTree:AddResearchNode(kTechId.Weapons3,               kTechId.Weapons2, kTechId.None)
+    self.techTree:AddResearchNode(kTechId.Weapons1,               kTechId.None)
+    self.techTree:AddResearchNode(kTechId.Weapons2,               kTechId.None, kTechId.None)
+    self.techTree:AddResearchNode(kTechId.Weapons3,               kTechId.None, kTechId.None)
     
     // Marine tier 2
     self.techTree:AddBuildNode(kTechId.AdvancedArmory,               kTechId.Armory,        kTechId.None)

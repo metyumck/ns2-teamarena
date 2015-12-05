@@ -17,9 +17,6 @@ local function UpdateUnitStatusPercentage(self, target)
 
 end
 
-function Marine:GetTechTree()
-    return self.techTree
-end
 
 function Marine:OnConstructTarget(target)
     UpdateUnitStatusPercentage(self, target)
@@ -313,7 +310,7 @@ function Marine:AttemptToBuy(techIds)
 
     local techId = techIds[1]
     
-    if techId == (kTechId.Armor1) then
+    if techId == kTechId.Armor1 or techId == kTechId.Armor2 then
         return true
     end
     

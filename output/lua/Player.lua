@@ -1526,21 +1526,11 @@ function Player:OnProcessSpectate(deltaTime)
 
 end
 
-function Player:InitTechTree()
-   
-    
-    self.techTree = TechTree()
-    self.techTree:CopyDataFrom(self:GetTeam():GetTechTree())
-    self.techTree:ComputeAvailability()
-    
- 
-end
+
 
 function Player:OnUpdate(deltaTime)
     
     ScriptActor.OnUpdate(self, deltaTime)
-    
-    
     
     if true then
         PROFILE("Player:OnUpdate:OnUpdatePlayer")
@@ -1638,6 +1628,14 @@ end
 
 function Player:GetExtentsCrouchShrinkAmount()
     return kExtentsCrouchShrinkAmount
+end
+
+function Player:GetTechTree()
+    if self.techTree ~= nil then
+        return self.techTree
+    else
+        return self:GetTeam():GetTechTree()
+    end
 end
 
 -- Recalculate self.onGround next time

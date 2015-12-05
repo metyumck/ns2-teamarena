@@ -604,18 +604,14 @@ function Player:ProcessBuyAction(techIds)
     local totalCost = 0
     local validBuyIds = { }
     
-     
+    
     
     for i, techId in ipairs(techIds) do
         
-        
-        local techNode = techTree:GetTechNode(techId)
-        techNode:SetResearched(true)
-        techNode:SetHasTech(true)
+        local techNode = techTree:GetTechNode(techId)   
         techNode:SetAvailable(true)
         techTree:SetTechNodeChanged(techNode)
-        techTree:SetTechChanged()
-        
+        techTree:SetTechChanged() 
         
         if(techNode ~= nil and techNode.available) and not self:GetHasUpgrade(techId) then
         
@@ -639,6 +635,11 @@ function Player:ProcessBuyAction(techIds)
     if totalCost <= self:GetResources() then
     
         if self:AttemptToBuy(validBuyIds) then
+            local techNode = techTree:GetTechNode(validBuyIds[1])
+            techNode:SetResearched(true)
+            techNode:SetHasTech(true)
+            techTree:SetTechNodeChanged(techNode)
+            techTree:SetTechChanged() 
             self:AddResources(-totalCost)
             return true
         end
@@ -729,13 +730,6 @@ function Player:UpdateMisc(input)
         
     end
     
-end
-
-function Player:GetTechTree()
-    
-    
-    return self.techTree
-
 end
 
 function Player:GetPreviousMapName()

@@ -79,6 +79,10 @@ function GameInfo:GetIsGatherReady()
     return self.isGatherReady
 end
 
+function GameInfo:GetListOfMarines()
+    return Shared.GetEntitiesWithClassname("Marine")
+end
+
 if Server then
 
     function GameInfo:SetStartTime(startTime)
