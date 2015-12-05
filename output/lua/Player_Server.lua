@@ -31,6 +31,9 @@ function Player:SetPlayerInfo(playerInfo)
     
 end
 
+//create a function that deep copies the team tech tree so armor, weapon upgrades and hive abilities don't "leak"
+
+
 function Player:Reset()
 
     ScriptActor.Reset(self)
@@ -595,23 +598,36 @@ function Player:ProcessBuyAction(techIds)
     ASSERT(type(techIds) == "table")
     ASSERT(table.count(techIds) > 0)
     
+    
     local techTree = self:GetTechTree()
     local buyAllowed = true
     local totalCost = 0
     local validBuyIds = { }
     
-    for i, techId in ipairs(techIds) do
+     
     
+    for i, techId in ipairs(techIds) do
+        
+        
         local techNode = techTree:GetTechNode(techId)
+        techNode:SetResearched(true)
+        techNode:SetHasTech(true)
+        techNode:SetAvailable(true)
+        techTree:SetTechNodeChanged(techNode)
+        techTree:SetTechChanged()
+        
+        
         if(techNode ~= nil and techNode.available) and not self:GetHasUpgrade(techId) then
         
             local cost = GetCostForTech(techId)
             if cost ~= nil then
+                
                 totalCost = totalCost + cost
                 table.insert(validBuyIds, techId)
             end
         
         else
+            
         
             buyAllowed = false
             break
@@ -716,15 +732,9 @@ function Player:UpdateMisc(input)
 end
 
 function Player:GetTechTree()
-
-    local techTree
-
-    local team = self:GetTeam()
-    if team ~= nil and team:isa("PlayingTeam") then
-        techTree = team:GetTechTree()
-    end
     
-    return techTree
+    
+    return self.techTree
 
 end
 

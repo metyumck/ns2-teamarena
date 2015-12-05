@@ -263,8 +263,9 @@ function MarineTeam:Update(timePassed)
         CheckForNoIPs(self)
     end
     
-    local armorLevel = GetArmorLevel(self)
+    
     for index, player in ipairs(GetEntitiesForTeam("Player", self:GetTeamNumber())) do
+        local armorLevel = player:GetArmorLevel()
         player:UpdateArmorAmount(armorLevel)
     end
     
@@ -340,7 +341,7 @@ function MarineTeam:InitTechTree()
     
     // arms lab upgrades
     
-    self.techTree:AddTargetedBuyNode(kTechId.Armor1,                 kTechId.None)
+    self.techTree:AddResearchNode(kTechId.Armor1,                 kTechId.None)
     self.techTree:AddTargetedBuyNode(kTechId.Armor2,                 kTechId.None, kTechId.None)
     self.techTree:AddTargetedBuyNode(kTechId.Armor3,                 kTechId.None, kTechId.None)    
     self.techTree:AddResearchNode(kTechId.NanoArmor,              kTechId.None)

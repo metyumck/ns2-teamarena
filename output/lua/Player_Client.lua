@@ -2974,7 +2974,7 @@ function PlayerUI_GetArmorLevel(researched)
     
     if Client.GetLocalPlayer().gameStarted then
     
-        local techTree = GetTechTree()
+        local techTree = Client.GetLocalPlayer():GetPersonalTechTree()
     
         if techTree then
         

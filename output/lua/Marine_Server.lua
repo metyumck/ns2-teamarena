@@ -17,6 +17,10 @@ local function UpdateUnitStatusPercentage(self, target)
 
 end
 
+function Marine:GetTechTree()
+    return self.techTree
+end
+
 function Marine:OnConstructTarget(target)
     UpdateUnitStatusPercentage(self, target)
 end
@@ -309,6 +313,10 @@ function Marine:AttemptToBuy(techIds)
 
     local techId = techIds[1]
     
+    if techId == (kTechId.Armor1) then
+        return true
+    end
+    
     local mapName = LookupTechData(techId, kTechDataMapName)
         
         if mapName then
@@ -318,6 +326,8 @@ function Marine:AttemptToBuy(techIds)
             if self:GetTeam() and self:GetTeam().OnBought then
                 self:GetTeam():OnBought(techId)
             end
+            
+            
             
             if techId == kTechId.Jetpack then
 
@@ -348,6 +358,8 @@ function Marine:AttemptToBuy(techIds)
     return false
     
 end
+
+
 
 // special threatment for mines and welders
 function Marine:GiveItem(itemMapName)

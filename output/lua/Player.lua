@@ -37,6 +37,10 @@ if Client then
     Script.Load("lua/HelpMixin.lua")
 end
 
+if Server then
+    Script.Load("lua/TechTree.lua")
+end
+
 --@Abstract
 class 'Player' (ScriptActor)
 
@@ -1522,10 +1526,22 @@ function Player:OnProcessSpectate(deltaTime)
 
 end
 
+function Player:InitTechTree()
+   
+    
+    self.techTree = TechTree()
+    self.techTree:CopyDataFrom(self:GetTeam():GetTechTree())
+    self.techTree:ComputeAvailability()
+    
+ 
+end
+
 function Player:OnUpdate(deltaTime)
-
+    
     ScriptActor.OnUpdate(self, deltaTime)
-
+    
+    
+    
     if true then
         PROFILE("Player:OnUpdate:OnUpdatePlayer")
         self:OnUpdatePlayer(deltaTime)
@@ -2477,6 +2493,14 @@ function Player:TriggerSuicide()
     if HasMixin(self, "Live") and self:GetCanDie() and not self.suiciding then
         self:AddTimedCallback(DelayedSuicide, kSuicideDelay)
     end
+
+end
+
+
+
+function Player:GetPersonalTechTree()
+    
+    return self.personalTechTree
 
 end
 
