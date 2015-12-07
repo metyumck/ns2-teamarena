@@ -36,7 +36,7 @@ local kRoundLimit = 13
 local kRoundRecord = {}
 local kMarineWins = 0
 local kAlienWins = 0
-local kBuyTimeLength = 7
+local kBuyTimeLength = 10
 
 for i=0, kRoundLimit - 1 do
    kRoundRecord[i] = 0
@@ -1161,8 +1161,7 @@ if Server then
             end
 
             self.sponitor:Update(timePassed)
-            self.gameInfo:SetIsGatherReady(Server.GetIsGatherReady())
-            
+            self.gameInfo:SetIsGatherReady(Server.GetIsGatherReady())            
         end
         
     end

@@ -61,18 +61,14 @@ function TechTree:CopyDataFrom(techTree)
     end
 end
 
-function TechTree:SendTechTreeUpdates(playerList)
+function TechTree:SendTechTreeUpdates(player)
 
     for techNodeIndex, techNode in ipairs(self.techNodesChanged) do
     
         local techNodeUpdateTable = BuildTechNodeUpdateMessage(techNode)
-        
-        for playerIndex, player in ipairs(playerList) do    
-        
-            Server.SendNetworkMessage(player, "TechNodeUpdate", techNodeUpdateTable, true)
-            
-        end
-        
+         
+        Server.SendNetworkMessage(player, "TechNodeUpdate", techNodeUpdateTable, true)
+               
     end
     
     table.clear(self.techNodesChanged)
@@ -723,7 +719,7 @@ end
 function GetHasTech(callingEntity, techId, silenceError)
 
     if callingEntity ~= nil and HasMixin(callingEntity, "Team") then
-    
+        
         local team = GetGamerules():GetTeam(callingEntity:GetTeamNumber())
         
         if team ~= nil and team:isa("PlayingTeam") then

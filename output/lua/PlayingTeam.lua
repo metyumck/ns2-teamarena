@@ -825,7 +825,7 @@ function PlayingTeam:Update(timePassed)
 
     PROFILE("PlayingTeam:Update")
     
-    self:UpdateTechTree()
+    //self:UpdateTechTree()
     
     self:UpdateVotes()
 
@@ -889,6 +889,7 @@ function PlayingTeam:PrintWorldTextForTeamInRange(messageType, data, position, r
 end
 
 function PlayingTeam:GetTechTree()
+    
     return self.techTree
 end
 
@@ -915,7 +916,9 @@ function PlayingTeam:UpdateTechTree()
         local players = self:GetPlayers()
         
         for index, player in ipairs(players) do
-        
+            
+            local playerTechTree = player:GetTechTree()
+            
             if player:GetSendTechTreeBase() then
             
                 self.techTree:SendTechTreeBase(player)

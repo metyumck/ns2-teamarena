@@ -399,9 +399,51 @@ local function InitViewModel(self)
     
 end
 
+function Player:InitTechTree()
+    if self:GetTeamNumber() ~= kNeutralTeamType then
+        
+        local team = self:GetTeam()
+        self.techTree = TechTree()
+        self.techTree:CopyDataFrom(team:GetTechTree())
+
+    end
+    
+end
+
+function Player:UpdateTechTree()
+
+    PROFILE("Player:UpdateTechTree")
+    
+    // Compute tech tree availability only so often because it's very slooow
+    if self.techTree and (self.timeOfLastTechTreeUpdate == nil or Shared.GetTime() > self.timeOfLastTechTreeUpdate + PlayingTeam.kTechTreeUpdateTime) then
+        
+
+        // Send tech tree base line to players that just switched teams or joined the game        
+        local player = self
+        
+        
+            
+        self.techTree:SendTechTreeBase(player)
+                
+      
+            
+        self.techTree:SendTechTreeUpdates(player)
+            
+       
+        
+        // Send research, availability, etc. tech node updates to team players
+        
+        self.timeOfLastTechTreeUpdate = Shared.GetTime()
+        
+    end
+    
+end
+
 function Player:OnInitialized()
 
     ScriptActor.OnInitialized(self)
+    
+    
     
     if Server then
 
@@ -412,6 +454,10 @@ function Player:OnInitialized()
         elseif self:GetTeamNumber() == kNeutralTeamType then
             self:InitWeaponsForReadyRoom()
         end
+        
+
+        self:InitTechTree()
+        
         
         self:SetName(kDefaultPlayerName)
         
@@ -1526,8 +1572,6 @@ function Player:OnProcessSpectate(deltaTime)
 
 end
 
-
-
 function Player:OnUpdate(deltaTime)
     
     ScriptActor.OnUpdate(self, deltaTime)
@@ -1536,6 +1580,8 @@ function Player:OnUpdate(deltaTime)
         PROFILE("Player:OnUpdate:OnUpdatePlayer")
         self:OnUpdatePlayer(deltaTime)
     end
+    
+    self:UpdateTechTree()
 
 end
 
@@ -1631,11 +1677,9 @@ function Player:GetExtentsCrouchShrinkAmount()
 end
 
 function Player:GetTechTree()
-    if self.techTree ~= nil then
-        return self.techTree
-    else
-        return self:GetTeam():GetTechTree()
-    end
+        
+    return self.techTree
+
 end
 
 -- Recalculate self.onGround next time

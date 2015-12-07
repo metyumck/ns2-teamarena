@@ -2969,16 +2969,17 @@ function PlayerUI_GetRecentPurchaseable()
 end
 
 -- returns 0 - 3
-function PlayerUI_GetArmorLevel(researched)
+function PlayerUI_GetArmorLevel()
     local armorLevel = 0
-    local player = Client.GetLocalPlayer()
-    Shared.Message("STage 1")
-    if Client.GetLocalPlayer().gameStarted and player ~= nil then
-        Shared.Message("STage 2")
-        local techTree = player:GetTechTree()
     
+    
+    if Client.GetLocalPlayer().gameStarted then
+        
+        local techTree = GetTechTree()
+        
+       
         if techTree then
-            Shared.Message("STage 3")    
+            
             local armor3Node = techTree:GetTechNode(kTechId.Armor3)
             local armor2Node = techTree:GetTechNode(kTechId.Armor2)
             local armor1Node = techTree:GetTechNode(kTechId.Armor1)

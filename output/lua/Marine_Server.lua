@@ -310,7 +310,7 @@ function Marine:AttemptToBuy(techIds)
 
     local techId = techIds[1]
     
-    if techId == kTechId.Armor1 or techId == kTechId.Armor2 then
+    if techId == kTechId.Armor1 or techId == kTechId.Armor2 or techId == kTechId.Armor3 or techId == kTechId.Weapons1 or techId == kTechId.Weapons2 or techId == kTechId.Weapons2 then
         return true
     end
     

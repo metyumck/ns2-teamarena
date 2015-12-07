@@ -179,17 +179,6 @@ AddMixinNetworkVars(PhaseGateUserMixin, networkVars)
 AddMixinNetworkVars(MarineVariantMixin, networkVars)
 AddMixinNetworkVars(ScoringMixin, networkVars)
 
-
-function Marine:InitTechTree()
-    local team = self:GetTeam()
-    
-    if Server and team:GetTeamNumber() == 1  then
-        self.techTree = TechTree()
-        self.techTree:CopyDataFrom(team:GetTechTree())
-    end 
-    
-end
-
 function Marine:OnCreate()
 
     InitMixin(self, BaseMoveMixin, { kGravity = Player.kGravity })
@@ -287,9 +276,10 @@ function Marine:OnInitialized()
     
     Player.OnInitialized(self)
     
-    if Server then
-        self:InitTechTree()
-    end
+    
+    --if Server then
+    --    self:InitTechTree()
+    --end
     // Calculate max and starting armor differently
     self.armor = 0
     
@@ -383,15 +373,16 @@ function Marine:GetArmorLevel()
 
 end
 
-function Marine:GetTechTree()
-    return self.techTree
-end
+function Marine:GetTechTreeMarine()
 
+    return self.techTree
+
+end
 
 function Marine:GetWeaponLevel()
 
     local weaponLevel = 0
-    local techTree = self:GetTechTree()
+    local techTree = self.techTree
 
     if techTree then
         

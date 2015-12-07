@@ -608,10 +608,7 @@ function Player:ProcessBuyAction(techIds)
     
     for i, techId in ipairs(techIds) do
         
-        local techNode = techTree:GetTechNode(techId)   
-        techNode:SetAvailable(true)
-        techTree:SetTechNodeChanged(techNode)
-        techTree:SetTechChanged() 
+        local techNode = techTree:GetTechNode(techId)    
         
         if(techNode ~= nil and techNode.available) and not self:GetHasUpgrade(techId) then
         
@@ -640,6 +637,7 @@ function Player:ProcessBuyAction(techIds)
             techNode:SetHasTech(true)
             techTree:SetTechNodeChanged(techNode)
             techTree:SetTechChanged() 
+            self:UpdateTechTree()
             self:AddResources(-totalCost)
             return true
         end

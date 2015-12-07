@@ -293,7 +293,7 @@ function TechNode:CopyDataFrom(techNode)
 	self.prereq2            = techNode.prereq2
 	self.addOnTechId        = techNode.addOnTechId
 	self.cost               = techNode.cost
-	self.available          = techNode.available
+	self.available          = true
 	self.time               = techNode.time
     self.researchProgress 	= techNode.researchProgress
     self.prereqResearchProgress = techNode.prereqResearchProgress

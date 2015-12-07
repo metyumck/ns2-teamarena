@@ -700,11 +700,8 @@ function GUIMarineHUD:Update(deltaTime)
     local armorLevel = 0
     local weaponLevel = 0
 
-    armorLevel = MarineUI_GetArmorLevel()
+    armorLevel = PlayerUI_GetArmorLevel()
     weaponLevel = PlayerUI_GetWeaponLevel()
-    
-    
-    Shared.Message("Armor level" .. armorLevel)
 
     self.armorLevel:SetIsVisible(armorLevel ~= 0)
     self.weaponLevel:SetIsVisible(weaponLevel ~= 0)

@@ -33,56 +33,11 @@ function MarineUI_GetHasArmsLab()
     local player = Client.GetLocalPlayer()
     
     if player then
-        return GetHasTech(player, kTechId.ArmsLab)
+        return true
     end
     
     return false
     
-end
-
-function MarineUI_GetArmorLevel(researched)
-    local armorLevel = 0
-    
-    
-    if Client.GetLocalPlayer().gameStarted then
-        
-        
-        
-        local techTree = false
-        
-        if techTree then
-             
-            local armor3Node = techTree:GetTechNode(kTechId.Armor3)
-            local armor2Node = techTree:GetTechNode(kTechId.Armor2)
-            local armor1Node = techTree:GetTechNode(kTechId.Armor1)
-            
-            if researched then
-        
-                if armor3Node and armor3Node:GetResearched() then
-                    armorLevel = 3
-                elseif armor2Node and armor2Node:GetResearched()  then
-                    armorLevel = 2
-                elseif armor1Node and armor1Node:GetResearched()  then
-                    armorLevel = 1
-                end
-            
-            else
-            
-                if armor3Node and armor3Node:GetHasTech() then
-                    armorLevel = 3
-                elseif armor2Node and armor2Node:GetHasTech()  then
-                    armorLevel = 2
-                elseif armor1Node and armor1Node:GetHasTech()  then
-                    armorLevel = 1
-                end
-            
-            end
-            
-        end
-    
-    end
-
-    return armorLevel
 end
 
 
@@ -410,7 +365,7 @@ end
 
 // Bring up buy menu
 function Marine:BuyMenu()
-    Shared.Message("WE are making it here")
+
     // Don't allow display in the ready room
     if self:GetTeamNumber() ~= 0 and Client.GetLocalPlayer() == self then
     
