@@ -439,7 +439,7 @@ if Server then
             self.team1:ReplaceRespawnAllPlayers()
             self.team2:ReplaceRespawnAllPlayers()
             
-            //Fine the VIP :)
+            //Find the VIP :)
             local VIPPlayer = self:FindTheChosenOne()
             
             //Add player to the list of past VIPs so they are not chosen next round
@@ -448,8 +448,8 @@ if Server then
             //Respawn the player 
             self.team1:RespawnVIP(VIPPlayer)
             
-            self.team1:SetTeamResources(self.team1:GetTeamResources() + 60)
-            self.team2:SetTeamResources(self.team2:GetTeamResources() + 60)
+            self.team1:SetTeamResources(self.team1:GetTeamResources() + self.team1:GetNumPlayers() * 5)
+            self.team2:SetTeamResources(self.team2:GetTeamResources() + self.team2:GetNumPlayers() * 5)
             self.team1:AssignResources()
             self.team2:AssignResources()
             self:SetGameState(kGameState.BuyTime)

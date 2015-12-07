@@ -1,0 +1,1 @@
+Script.Load("lua/Weapons/Marine/RailPistol.lua")

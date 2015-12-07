@@ -1,5 +1,6 @@
 Script.Load("lua/Marine.lua")
 
+
 class 'VIP' (Marine)
 
 VIP.kMapName = "vip"
@@ -27,11 +28,16 @@ function ActivateNanoShieldWrapper(self)
     return true
 end
 
+
+
+function VIP:OnCreate()
+    Marine.OnCreate(self)
+end
+
 function VIP:OnInitialized()
+    
     Marine.OnInitialized(self)
     self:ActivateNanoShield()
-    self:AddTimedCallback(UpdateNanoArmor, 1)
-    self:AddTimedCallback(ActivateNanoShieldWrapper, 0.7)
 end
 
 

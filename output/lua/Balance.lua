@@ -299,6 +299,10 @@ kRailgunDamage = 33
 kRailgunChargeDamage = 140
 kRailgunDamageType = kDamageType.Structural
 
+kRailPistolDamage = 20
+kRailPistolChargeDamage = 45
+kRailPistolDamageType = kDamageType.Structural
+
 kMACAttackDamage = 5
 kMACAttackDamageType = kDamageType.Normal
 kMACAttackFireDelay = 0.6
@@ -491,7 +495,7 @@ kARCBuildTime = 7
 kARCSplashTechResearchTime = 30
 kARCArmorTechResearchTime = 30
 
-kNanoShieldDuration = 5
+kNanoShieldDuration = 120
 kSentryBuildTime = 3
 
 kNanoShieldResearchCost = 15
