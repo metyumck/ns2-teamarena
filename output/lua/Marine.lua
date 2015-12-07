@@ -477,7 +477,13 @@ function Marine:HandleButtons(input)
         end
         self.flashlightLastFrame = flashlightPressed
         
-            
+        
+        
+        if input.commands == Move.RequestHealth then
+            Shared.Message("Input: " .. tostring(input.commands) .. "Move :" .. tostring(Move.RequestHealth) )
+			self:AddHealth(MedPack.kHealth, false, true)
+			self:AddResources(-1)
+    	end    
        
         
         if bit.band(input.commands, Move.Drop) ~= 0 and not self:GetIsVortexed() then

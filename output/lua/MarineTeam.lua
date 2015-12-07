@@ -10,6 +10,7 @@
 // ========= For more information, visit us at http://www.unknownworlds.com =====================
 
 Script.Load("lua/Marine.lua")
+Script.Load("lua/VIP.lua")
 Script.Load("lua/PlayingTeam.lua")
 
 class 'MarineTeam' (PlayingTeam)
@@ -72,6 +73,13 @@ function MarineTeam:Initialize(teamName, teamNumber)
     self.lastTimeNoIPsMessageSent = Shared.GetTime()
     
     
+end
+
+function MarineTeam:RespawnVIP(vipPlayer)
+    
+    
+    self:ReplaceRespawnPlayer(vipPlayer, nil, nil, VIP.kMapName)
+
 end
 
 function MarineTeam:GetHasAbilityToRespawn()

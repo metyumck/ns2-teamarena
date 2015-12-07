@@ -677,6 +677,7 @@ function PlayingTeam:ReplaceRespawnPlayer(player, origin, angles, mapName)
         spawnMapName = mapName
     end
     
+    
     local newPlayer = player:Replace(spawnMapName, self:GetTeamNumber(), false, origin)
     
     // If we fail to find a place to respawn this player, put them in the Team's

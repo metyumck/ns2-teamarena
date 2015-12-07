@@ -30,12 +30,12 @@ local kTimeToReadyRoom = 8
 local kPauseToSocializeBeforeMapcycle = 30
 local kGameStartMessageInterval = 10
 
-//Variables for keeping track of game state
-local kRoundCount = 1
+//Variables for keeping track of game state. Need to refactor as it seem k variables are constants :(
+local roundCount = 1
 local kRoundLimit = 13
 local kRoundRecord = {}
-local kMarineWins = 0
-local kAlienWins = 0
+local marineWins = 0
+local alienWins = 0
 local kBuyTimeLength = 10
 
 for i=0, kRoundLimit - 1 do
@@ -158,7 +158,7 @@ if Server then
             if self.gameState == kGameState.Started then
             
                 PostGameViz("Game started")
-                if ((kMarineWins == 0) and (kAlienWins == 0)) then
+                if ((marineWins == 0) and (alienWins == 0)) then
                     self:ResetPlayerScores()
                 end
                 self.gameStartTime = Shared.GetTime()
@@ -230,6 +230,8 @@ if Server then
         self.autobuild = false
         self.teamsReady = false
         self.tournamentMode = false
+        
+        self.listOfPastVIPs = {}
         
         self:SetIsVisible(false)
         self:SetPropagate(Entity.Propagate_Never)
@@ -400,11 +402,28 @@ if Server then
         
     end
     
+    function NS2Gamerules:FindTheChosenOne()
+        //Chooses a random steam ID for the VIP
+        
+        local chosenOne = nil
+        
+        local playerList = self.team1:GetPlayers()
+
+        for index, player in pairs(playerList) do
+            
+            if  player:GetSteamId() > 0 then
+                chosenOne = player
+            end  
+        end
+        
+        return chosenOne
+    end
+    
     function NS2Gamerules:BeginNewRound()
         
         
         
-        local winConditionMet = self:GetWinConditionMet(kMarineWins, kAlienWins)
+        local winConditionMet = self:GetWinConditionMet(marineWins, alienWins)
             
         if winConditionMet == 1 then
             self:EndGame(self.team1)
@@ -419,6 +438,16 @@ if Server then
         if winConditionMet < 1 then
             self.team1:ReplaceRespawnAllPlayers()
             self.team2:ReplaceRespawnAllPlayers()
+            
+            //Fine the VIP :)
+            local VIPPlayer = self:FindTheChosenOne()
+            
+            //Add player to the list of past VIPs so they are not chosen next round
+            table.insert(self.listOfPastVIPs, VIPPlayer)
+
+            //Respawn the player 
+            self.team1:RespawnVIP(VIPPlayer)
+            
             self.team1:SetTeamResources(self.team1:GetTeamResources() + 60)
             self.team2:SetTeamResources(self.team2:GetTeamResources() + 60)
             self.team1:AssignResources()
@@ -647,12 +676,27 @@ if Server then
         
     end
     
-    function NS2Gamerules:GetSteamIdOfMarineNearEnemyTechpoint()
+    function NS2Gamerules:GetIsVIPDead()
+        local vipList = Shared.GetEntitiesWithClassname("VIP")
+        
+        if vipList:GetSize() < 1 then
+            return true
+        end
+        
+        local vip = vipList:GetEntityAtIndex(0)
+        
+        if vip:GetIsAlive() ~= true then
+            return true
+        end
+    end
+    
+    function NS2Gamerules:GetHasVIPReachedTechpoint()
         
         
-        for index, marine in ipairs(GetEntitiesWithinRange("Marine", Vector(self.startingLocationTeam2:GetOrigin()), 3)) do
-            if marine:GetSteamId() then
-                Shared.Message("Marines near techpoint" .. tostring(marine:GetSteamId()))
+        for index, vip in ipairs(GetEntitiesWithinRange("VIP", Vector(self.startingLocationTeam2:GetOrigin()), 3)) do
+            if vip:GetSteamId() then
+                Shared.Message("vip " .. vip:GetSteamId() .. " has reached the objective")
+                return true
             end
         end 
         
@@ -1276,9 +1320,9 @@ if Server then
             self.timeDrawWindowEnds = nil
             
             //Clear RoundRecord and reset alien and marine wins
-            kMarineWins = 0
-            kAlienWins = 0
-            kRoundCount = 1
+            marineWins = 0
+            alienWins = 0
+            roundCount = 1
             for i=0, kRoundLimit - 1 do
                kRoundRecord[i] = 0
             end
@@ -1545,11 +1589,11 @@ if Server then
             
                 if self:GetGameState() == kGameState.NotStarted then
                     self:SetGameState(kGameState.PreGame)
-                    self.kMarineWins = 0
-                    self.kAlienWins = 0
+                    self.marineWins = 0
+                    self.alienWins = 0
                     //propogate reset scores to the UI
-                    self.gameInfo:SetAlienWins(self.kAlienWins)
-                    self.gameInfo:SetMarineWins(self.kMarineWins)
+                    self.gameInfo:SetAlienWins(self.alienWins)
+                    self.gameInfo:SetMarineWins(self.marineWins)
                     self.team1:AssignResources()
                     self.team2:AssignResources()
         
@@ -1638,27 +1682,27 @@ if Server then
     
     function NS2Gamerules:CheckRoundEnd()
         if self:GetGameStarted() and not Shared.GetCheatsEnabled() then
-            self:GetSteamIdOfMarineNearEnemyTechpoint()
             
-            if self.team1:GetHasTeamLostRound() and (self.team1:GetNumPlayers() > 0 and self.team2:GetNumPlayers() > 0) then
-                Server.SendNetworkMessage("Chat", BuildChatMessage(false, "Team Arena Bot", -1, kTeamReadyRoom, kNeutralTeamType, "Aliens win round " .. kRoundCount .. ". Starting round " .. kRoundCount + 1 ), true)
+            
+            if (self.team1:GetHasTeamLostRound() and (self.team1:GetNumPlayers() > 0 and self.team2:GetNumPlayers() > 0)) and not self:GetHasVIPReachedTechpoint() or self:GetIsVIPDead() then
+                Server.SendNetworkMessage("Chat", BuildChatMessage(false, "Team Arena Bot", -1, kTeamReadyRoom, kNeutralTeamType, "Aliens win round " .. roundCount .. ". Starting round " .. roundCount + 1 ), true)
                 self:CheckGameEnd()
                 
-                kRoundCount = kRoundCount + 1
-                kAlienWins = kAlienWins + 1
-                self:EndRound(self.team2, kRoundCount)
-                self.gameInfo:SetAlienWins(kAlienWins)
+                roundCount = roundCount + 1
+                alienWins = alienWins + 1
+                self:EndRound(self.team2, roundCount)
+                self.gameInfo:SetAlienWins(alienWins)
                 
                 
-            elseif self.team2:GetHasTeamLostRound() and (self.team1:GetNumPlayers() > 0 and self.team2:GetNumPlayers() > 0) then
-                Server.SendNetworkMessage("Chat", BuildChatMessage(false, "Team Arena Bot", -1, kTeamReadyRoom, kNeutralTeamType, "Marines win round " .. kRoundCount .. ". Starting round " .. kRoundCount + 1 ), true)
+            elseif (self.team2:GetHasTeamLostRound() and (self.team1:GetNumPlayers() > 0 and self.team2:GetNumPlayers() > 0)) and not self:GetIsVIPDead() or self:GetHasVIPReachedTechpoint() then
+                Server.SendNetworkMessage("Chat", BuildChatMessage(false, "Team Arena Bot", -1, kTeamReadyRoom, kNeutralTeamType, "Marines win round " .. roundCount .. ". Starting round " .. roundCount + 1 ), true)
                 self:CheckGameEnd()
                 
-                kRoundCount = kRoundCount + 1
-                kMarineWins = kMarineWins + 1
-                self:EndRound(self.team1, kRoundCount)
+                roundCount = roundCount + 1
+                marineWins = marineWins + 1
+                self:EndRound(self.team1, roundCount)
                 
-                self.gameInfo:SetMarineWins(kMarineWins)
+                self.gameInfo:SetMarineWins(marineWins)
             end
             
             
@@ -1723,7 +1767,8 @@ if Server then
     
     local function StartBuytime(self)
         
-        self:SetGameState(kGameState.BuyTime)
+        self:BeginNewRound()
+        
         self.buytime = kBuyTimeLength
         
         self.lastBuyTimePlayed = nil
