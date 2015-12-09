@@ -13,7 +13,7 @@ class 'RailPistol' (ClipWeapon)
 
 RailPistol.kMapName = "railpistol"
 
-local kModelName = PrecacheAsset("models/marine/welder/welder_view.model")
+local kModelName = PrecacheAsset("models/marine/welder/welder.model")
 local kViewModels = GenerateMarineViewModelPaths("welder")
 local kAnimationGraph = PrecacheAsset("models/marine/exosuit/exosuit_rr_view.animation_graph")
 local kChargeTime = 2
@@ -95,10 +95,6 @@ function RailPistol:OnHolster(player)
     ClipWeapon.OnHolster(self, player)
     
     self.building = false
-    
-    if Server then
-        self.loopingFireSound:Stop()
-    end
     
 end
 

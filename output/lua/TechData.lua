@@ -755,14 +755,14 @@ function LookupTechData(techId, fieldName, default)
     
     if techId == nil or techId == 0 or fieldName == nil or fieldName == "" then
     
-        /*    
+         
         local techIdString = ""
         if type(tonumber(techId)) == "number" then            
             techIdString = EnumToString(kTechId, techId)
         end
         
         Print("LookupTechData(%s, %s, %s) called improperly.", tostring(techIdString), tostring(fieldName), tostring(default))
-        */
+       
         
         return default
         

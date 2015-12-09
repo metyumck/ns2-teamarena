@@ -1,7 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <project>
   <file>
+    <filename>AlienBuy_Client.lua</filename>
+  </file>
+  <file>
     <filename>AlienTeam.lua</filename>
+  </file>
+  <file>
+    <filename>Alien_Client.lua</filename>
+  </file>
+  <file>
+    <filename>Alien_Server.lua</filename>
   </file>
   <file>
     <filename>Balance.lua</filename>
@@ -10,10 +19,10 @@
     <filename>BalanceMisc.lua</filename>
   </file>
   <file>
-    <filename>BuyMenu_Client.lua</filename>
+    <filename>CommandStructure.lua</filename>
   </file>
   <file>
-    <filename>CommandStructure.lua</filename>
+    <filename>GUIAlienBuyMenu.lua</filename>
   </file>
   <file>
     <filename>GUIAlienHUD.lua</filename>
@@ -47,6 +56,9 @@
   </file>
   <file>
     <filename>NS2Gamerules.lua</filename>
+  </file>
+  <file>
+    <filename>NS2Utility.lua</filename>
   </file>
   <file>
     <filename>Player.lua</filename>

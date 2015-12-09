@@ -400,13 +400,18 @@ local function InitViewModel(self)
 end
 
 function Player:InitTechTree()
-    if self:GetTeamNumber() ~= kNeutralTeamType then
-        
-        local team = self:GetTeam()
-        self.techTree = TechTree()
-        self.techTree:CopyDataFrom(team:GetTechTree())
 
-    end
+        if self:GetTeamNumber() ~= kNeutralTeamType then
+            
+            local team = self:GetTeam()
+            self.techTree = TechTree()
+            self.techTree:CopyDataFrom(team:GetTechTree())
+            Shared.Message("Techtree" .. tostring(self.techTree))
+            Shared.Message("Just copiedtech tree for team: " .. team:GetTeamNumber())
+
+        end
+    
+
     
 end
 
@@ -424,13 +429,9 @@ function Player:UpdateTechTree()
         
             
         self.techTree:SendTechTreeBase(player)
-                
-      
-            
+                        
         self.techTree:SendTechTreeUpdates(player)
-            
-       
-        
+               
         // Send research, availability, etc. tech node updates to team players
         
         self.timeOfLastTechTreeUpdate = Shared.GetTime()
@@ -2535,14 +2536,6 @@ function Player:TriggerSuicide()
     if HasMixin(self, "Live") and self:GetCanDie() and not self.suiciding then
         self:AddTimedCallback(DelayedSuicide, kSuicideDelay)
     end
-
-end
-
-
-
-function Player:GetPersonalTechTree()
-    
-    return self.personalTechTree
 
 end
 

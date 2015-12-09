@@ -246,6 +246,14 @@ function Marine:GetCanJump()
     return not self:GetIsWebbed() and ( self:GetIsOnGround() or self:GetIsOnLadder() )
 end
 
+-- function Marine:InitTechTree()
+--    if Server then
+--        self.techTree = TechTree()
+--        self.techTree:CopyDataFrom(self:GetTeam():GetTechTree())
+--    end
+--end
+
+
 function Marine:OnInitialized()
 
     // work around to prevent the spin effect at the infantry portal spawned from
@@ -276,10 +284,6 @@ function Marine:OnInitialized()
     
     Player.OnInitialized(self)
     
-    
-    --if Server then
-    --    self:InitTechTree()
-    --end
     // Calculate max and starting armor differently
     self.armor = 0
     
@@ -370,12 +374,6 @@ function Marine:GetArmorLevel()
     end
 
     return armorLevel
-
-end
-
-function Marine:GetTechTreeMarine()
-
-    return self.techTree
 
 end
 
@@ -476,14 +474,7 @@ function Marine:HandleButtons(input)
             
         end
         self.flashlightLastFrame = flashlightPressed
-        
-        
-        
-        if input.commands == Move.RequestHealth then
-            Shared.Message("Input: " .. tostring(input.commands) .. "Move :" .. tostring(Move.RequestHealth) )
-			self:AddHealth(MedPack.kHealth, false, true)
-			self:AddResources(-1)
-    	end    
+         
        
         
         if bit.band(input.commands, Move.Drop) ~= 0 and not self:GetIsVortexed() then

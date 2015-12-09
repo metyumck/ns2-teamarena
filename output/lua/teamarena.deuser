@@ -8,4 +8,15 @@
     <local_path></local_path>
     <aux_project_path></aux_project_path>
   </scc>
+  <files>
+    <file>
+      <filename>NS2Gamerules.lua</filename>
+      <breakpoint>
+        <line>462</line>
+      </breakpoint>
+      <breakpoint>
+        <line>1791</line>
+      </breakpoint>
+    </file>
+  </files>
 </project>

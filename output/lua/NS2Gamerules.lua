@@ -37,6 +37,7 @@ local kRoundRecord = {}
 local marineWins = 0
 local alienWins = 0
 local kBuyTimeLength = 10
+local kRoundLength = 120
 
 for i=0, kRoundLimit - 1 do
    kRoundRecord[i] = 0
@@ -411,16 +412,16 @@ if Server then
 
         for index, player in pairs(playerList) do
             
-            if  player:GetSteamId() > 0 then
-                chosenOne = player
-            end  
+            
+            chosenOne = player
+     
         end
         
         return chosenOne
     end
     
     function NS2Gamerules:BeginNewRound()
-        
+   
         
         
         local winConditionMet = self:GetWinConditionMet(marineWins, alienWins)
@@ -435,7 +436,12 @@ if Server then
         
         
             
-        if winConditionMet < 1 then
+        if winConditionMet < 1 and not Shared.GetCheatsEnabled() then
+            
+            self.roundStartTime = Shared.GetTime()
+            
+            Shared.Message("Round start " .. tostring(Shared.GetTime()))
+
             self.team1:ReplaceRespawnAllPlayers()
             self.team2:ReplaceRespawnAllPlayers()
             
@@ -453,6 +459,8 @@ if Server then
             self.team1:AssignResources()
             self.team2:AssignResources()
             self:SetGameState(kGameState.BuyTime)
+            
+            
         end
         
         
@@ -1173,8 +1181,9 @@ if Server then
                     self:CheckRoundEnd()
                 end
                 
-                
-                
+                if self.roundStart then
+                    self:UpdateRoundTime(timePassed)
+                end
                 self:UpdateBuyTime(timePassed)
                 self:UpdatePregame(timePassed)
                 self:UpdateToReadyRoom()
@@ -1268,16 +1277,6 @@ if Server then
         
         if self.gameState ~= kGameState.Team1Won and self.gameState ~= kGameState.Team2Won then
             self:BeginNewRound()
-        end
-        
-        if winningTeam:GetTeamType() == kAlienTeamType then
-            kRoundRecord[roundNumber - 1] = "Aliens"
-        elseif winningTeam:GetTeamType() == kMarineTeamType then
-            kRoundRecord[roundNumber - 1] = "Marines"
-        end
-        
-        for i=0, kRoundLimit - 1 do
-           Shared.Message(ToString(kRoundRecord[i]))
         end
         
         
@@ -1683,8 +1682,24 @@ if Server then
     function NS2Gamerules:CheckRoundEnd()
         if self:GetGameStarted() and not Shared.GetCheatsEnabled() then
             
+            if Shared.GetTime() > (self.roundStartTime + kRoundLength - 90) and Shared.GetTime() < (self.roundStartTime + kRoundLength - 88) then
+                Shared.Message("90 seconds remain")
+            end
             
-            if (self.team1:GetHasTeamLostRound() and (self.team1:GetNumPlayers() > 0 and self.team2:GetNumPlayers() > 0)) and not self:GetHasVIPReachedTechpoint() or self:GetIsVIPDead() then
+            //Aliens win if the round time runs down
+            if Shared.GetTime() > self.roundStartTime + kRoundLength then
+                
+                Server.SendNetworkMessage("Chat", BuildChatMessage(false, "Team Arena Bot", -1, kTeamReadyRoom, kNeutralTeamType, "Aliens win round " .. roundCount .. ". Starting round " .. roundCount + 1 ), true)
+                
+                self:CheckGameEnd()
+                
+                roundCount = roundCount + 1
+                alienWins = alienWins + 1
+                self:EndRound(self.team2, roundCount)
+                self.gameInfo:SetAlienWins(alienWins)
+            
+            
+            elseif (self.team1:GetHasTeamLostRound() and (self.team1:GetNumPlayers() > 0 and self.team2:GetNumPlayers() > 0)) and not self:GetHasVIPReachedTechpoint() or self:GetIsVIPDead() then
                 Server.SendNetworkMessage("Chat", BuildChatMessage(false, "Team Arena Bot", -1, kTeamReadyRoom, kNeutralTeamType, "Aliens win round " .. roundCount .. ". Starting round " .. roundCount + 1 ), true)
                 self:CheckGameEnd()
                 
@@ -1711,9 +1726,9 @@ if Server then
     
     //If a team has more that 6 rounds and is ahead of the other team by 2, pronounce a winner
     function NS2Gamerules:GetWinConditionMet(marineWins, alienWins)
-        if (marineWins > 2) and ((marineWins - alienWins) >= 2) or self.team2:GetNumPlayers() < 1 then
+        if (marineWins > 9) and ((marineWins - alienWins) >= 2) or self.team2:GetNumPlayers() < 1 then
             return 1
-        elseif (alienWins > 2) and ((alienWins - marineWins) >= 2) or self.team1:GetNumPlayers() < 1 then
+        elseif (alienWins > 9) and ((alienWins - marineWins) >= 2) or self.team1:GetNumPlayers() < 1 then
             return 2
         else 
             return 0
