@@ -19,7 +19,7 @@ PlayingTeam.kObliterateVictoryTeamResourcesNeeded = 500
 
 PlayingTeam.kTooltipHelpInterval = 1
 
-PlayingTeam.kTechTreeUpdateTime = 1
+PlayingTeam.kTechTreeUpdateTime = 100
 
 PlayingTeam.kBaseAlertInterval = 15
 PlayingTeam.kRepeatAlertInterval = 15
@@ -826,7 +826,7 @@ function PlayingTeam:Update(timePassed)
 
     PROFILE("PlayingTeam:Update")
     
-    //self:UpdateTechTree()
+    self:UpdateTechTree()
     
     self:UpdateVotes()
 

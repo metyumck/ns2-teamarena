@@ -454,8 +454,8 @@ if Server then
             //Respawn the player 
             self.team1:RespawnVIP(VIPPlayer)
             
-            self.team1:SetTeamResources(self.team1:GetTeamResources() + self.team1:GetNumPlayers() * 5)
-            self.team2:SetTeamResources(self.team2:GetTeamResources() + self.team2:GetNumPlayers() * 5)
+            self.team1:SetTeamResources(self.team1:GetTeamResources() + self.team1:GetNumPlayers() * 3)
+            self.team2:SetTeamResources(self.team2:GetTeamResources() + self.team2:GetNumPlayers() * 3)
             self.team1:AssignResources()
             self.team2:AssignResources()
             self:SetGameState(kGameState.BuyTime)
@@ -1579,12 +1579,12 @@ if Server then
     
         if self:GetGameState() == kGameState.NotStarted or self:GetGameState() == kGameState.PreGame then
         
-            -- Start pre-game when both teams have 3 players
+            -- Start pre-game when both teams have 2 players
             
             local team1Count = self.team1:GetNumPlayers()
             local team2Count = self.team2:GetNumPlayers()
             
-            if ((team1Count >= 3 and team2Count >= 3) or Shared.GetCheatsEnabled()) and (not self.tournamentMode or self.teamsReady) then
+            if ((team1Count >= 2 and team2Count >= 2) or Shared.GetCheatsEnabled()) and (not self.tournamentMode or self.teamsReady) then
             
                 if self:GetGameState() == kGameState.NotStarted then
                     self:SetGameState(kGameState.PreGame)
@@ -1604,8 +1604,8 @@ if Server then
                     self:SetGameState(kGameState.NotStarted)
                 end
                 
-                if (not team1Commander or not team2Commander) and not self.nextGameStartMessageTime or Shared.GetTime() > self.nextGameStartMessageTime then
-                
+                if (team1Count < 2 and team2Count < 2) and not self.nextGameStartMessageTime or Shared.GetTime() > self.nextGameStartMessageTime then
+                    
                     SendTeamMessage(self.team1, kTeamMessageTypes.GameStartCommanders)
                     SendTeamMessage(self.team2, kTeamMessageTypes.GameStartCommanders)
                     self.nextGameStartMessageTime = Shared.GetTime() + kGameStartMessageInterval

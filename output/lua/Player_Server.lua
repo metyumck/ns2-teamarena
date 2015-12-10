@@ -590,6 +590,19 @@ function Player:GetIsAllowedToBuy()
     return self:GetIsAlive() and not GetIsVortexed(self)
 end
 
+function Player:GetTechTree()
+    
+    local techTree
+
+    local team = self:GetTeam()
+    if team ~= nil and team:isa("PlayingTeam") then
+        techTree = team:GetTechTree()
+    end
+    
+    return techTree
+
+end
+
 --[[
  * A table of tech Ids is passed in.
 ]]

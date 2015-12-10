@@ -140,7 +140,7 @@ function AlienBuy_GetTechAvailable(techId)
 end
 
 function AlienBuy_GetHasTech(techId)
-    return GetHasTech(Client.GetLocalPlayer(), techId)
+    return true
 end
 
 function AlienBuy_GetIsUpgradeAllowed(techId, upgradeList)
@@ -335,12 +335,10 @@ local function PurchaseTechs(purchaseIds)
     assert(purchaseIds)
     assert(table.count(purchaseIds) > 0)
     
-    local player = Client.GetLocalPlayer()
-    
     local validPurchaseIds = { }
     
     for i = 1, #purchaseIds do
-        Shared.Message("Getting to here")
+
         local purchaseId = purchaseIds[i]
         local techNode = GetTechTree():GetTechNode(purchaseId)
         
@@ -403,7 +401,7 @@ function GetAlienTechNode(idx, isAlienIndex)
         techId = IndexToAlienTechId(idx)
     end
     
-    local techTree = player:GetTechTree()
+    local techTree = GetTechTree()
     
    
     

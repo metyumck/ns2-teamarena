@@ -178,7 +178,7 @@ kLerkCost = 15
 kLerkEggCost = 30
 kFadeCost = 25
 kFadeEggCost = 70
-kOnosCost = 55
+kOnosCost = 2000
 kOnosEggCost = 100
 
 kSkulkUpgradeCost = 7

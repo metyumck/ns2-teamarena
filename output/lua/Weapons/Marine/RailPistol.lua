@@ -13,7 +13,7 @@ class 'RailPistol' (ClipWeapon)
 
 RailPistol.kMapName = "railpistol"
 
-local kModelName = PrecacheAsset("models/marine/welder/welder.model")
+local kModelName = PrecacheAsset("models/marine/welder/builder.model")
 local kViewModels = GenerateMarineViewModelPaths("welder")
 local kAnimationGraph = PrecacheAsset("models/marine/exosuit/exosuit_rr_view.animation_graph")
 local kChargeTime = 2
@@ -74,7 +74,7 @@ function RailPistol:GetSprintAllowed()
 end
 
 function RailPistol:GetHUDSlot()
-    return kPrimaryWeaponSlot
+    return kNoWeaponSlot
 end
 
 function RailPistol:GetWeight()
@@ -124,8 +124,7 @@ function RailPistol:OnUpdateAnimationInput(modelMixin)
     PROFILE("Builder:OnUpdateAnimationInput")
     
     modelMixin:SetAnimationInput("activity", "primary")
-    modelMixin:SetAnimationInput("welder", true)
-    self:SetPoseParam("welder", 0)
+    modelMixin:SetAnimationInput("welder", false)
     
 end
 

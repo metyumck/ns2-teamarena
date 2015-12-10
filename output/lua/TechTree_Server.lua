@@ -61,12 +61,30 @@ function TechTree:CopyDataFrom(techTree)
     end
 end
 
-function TechTree:SendTechTreeUpdates(player)
+function TechTree:SendTechTreeUpdates(playerList)
 
     for techNodeIndex, techNode in ipairs(self.techNodesChanged) do
     
         local techNodeUpdateTable = BuildTechNodeUpdateMessage(techNode)
          
+        for playerIndex, player in ipairs(playerList) do    
+        
+            Server.SendNetworkMessage(player, "TechNodeUpdate", techNodeUpdateTable, true)
+            
+        end
+               
+    end
+    
+    table.clear(self.techNodesChanged)
+    
+end
+
+function TechTree:SendTechTreeUpdateToPlayer(player)
+
+    for techNodeIndex, techNode in ipairs(self.techNodesChanged) do
+    
+        local techNodeUpdateTable = BuildTechNodeUpdateMessage(techNode)
+           
         Server.SendNetworkMessage(player, "TechNodeUpdate", techNodeUpdateTable, true)
                
     end

@@ -400,25 +400,20 @@ local function InitViewModel(self)
 end
 
 function Player:InitTechTree()
-
-        if self:GetTeamNumber() ~= kNeutralTeamType then
             
             local team = self:GetTeam()
             self.techTree = TechTree()
             self.techTree:CopyDataFrom(team:GetTechTree())
             Shared.Message("Techtree" .. tostring(self.techTree))
             Shared.Message("Just copiedtech tree for team: " .. team:GetTeamNumber())
-
-        end
-    
-
-    
 end
 
 function Player:UpdateTechTree()
 
     PROFILE("Player:UpdateTechTree")
     
+    Shared.Message("Is techtree a thing? " .. tostring(self.techTree))
+    Shared.Message(tostring((self.timeOfLastTechTreeUpdate == nil or Shared.GetTime() > self.timeOfLastTechTreeUpdate + PlayingTeam.kTechTreeUpdateTime)))
     // Compute tech tree availability only so often because it's very slooow
     if self.techTree and (self.timeOfLastTechTreeUpdate == nil or Shared.GetTime() > self.timeOfLastTechTreeUpdate + PlayingTeam.kTechTreeUpdateTime) then
         
@@ -427,7 +422,7 @@ function Player:UpdateTechTree()
         local player = self
         
         
-            
+        Shared.Message("updating tech tree base for " .. player:GetSteamId())
         self.techTree:SendTechTreeBase(player)
                         
         self.techTree:SendTechTreeUpdates(player)
@@ -457,7 +452,7 @@ function Player:OnInitialized()
         end
         
 
-        self:InitTechTree()
+        //self:InitTechTree()
         
         
         self:SetName(kDefaultPlayerName)
@@ -1582,7 +1577,7 @@ function Player:OnUpdate(deltaTime)
         self:OnUpdatePlayer(deltaTime)
     end
     
-    self:UpdateTechTree()
+    //self:UpdateTechTree()
 
 end
 
@@ -1677,11 +1672,7 @@ function Player:GetExtentsCrouchShrinkAmount()
     return kExtentsCrouchShrinkAmount
 end
 
-function Player:GetTechTree()
-        
-    return self.techTree
 
-end
 
 -- Recalculate self.onGround next time
 function Player:SetOrigin(origin)

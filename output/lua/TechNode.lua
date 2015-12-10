@@ -225,7 +225,7 @@ end
 
 // Indicates if we this tech node can be bought, researched, etc.
 function TechNode:GetAvailable()
-    return self.available
+    return true
 end
 
 function TechNode:SetAvailable(available)

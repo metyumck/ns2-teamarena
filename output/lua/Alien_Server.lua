@@ -156,7 +156,7 @@ function Alien:ProcessBuyAction(techIds)
         local trace = Shared.TraceRay(position, position + Vector(0, -0.5, 0), CollisionRep.Move, PhysicsMask.AllButPCs, EntityFilterOne(self))
         
         if upgradesAllowed and trace.surface ~= "no_evolve" then
-        Shared.Message("Getting here 2")
+        
             // Check for room
             local eggExtents = LookupTechData(kTechId.Embryo, kTechDataMaxExtents)
             local newLifeFormTechId = upgradeManager:GetLifeFormTechId()
@@ -209,7 +209,7 @@ function Alien:ProcessBuyAction(techIds)
             end
             
             if evolveAllowed and roomAfter ~= nil then
-                Shared.Message("Getting here 3")
+                
                 local newPlayer = self:Replace(Embryo.kMapName)
                 position.y = position.y + Embryo.kEvolveSpawnOffset
                 newPlayer:SetOrigin(position)

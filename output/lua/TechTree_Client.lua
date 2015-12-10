@@ -27,10 +27,10 @@ function GetHasTech(callingEntity, techId, silentError)
 end
 
 function GetTechNode(techId)
-
+    
     local techTree = GetTechTree()
     
-    if(techTree) then
+    if (techTree) then
     
         return techTree:GetTechNode(techId)
         

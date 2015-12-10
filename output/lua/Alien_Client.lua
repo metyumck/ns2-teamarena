@@ -695,10 +695,10 @@ function Alien:GetFirstPersonHitEffectName()
 end 
 
 function AlienUI_GetPersonalUpgrades()
-    local localPlayer = Client.GetLocalPlayer()
+   
     local upgrades = {}
    
-    local techTree = localPlayer:GetTechTree()
+    local techTree = GetTechTree()
     
     if techTree then
     
@@ -716,36 +716,37 @@ function AlienUI_GetUpgradesForCategory(category)
     
     local upgrades = {}
     
-    --local techTree = GetTechTree()
-    --Shared.Message("tech tree none")
-    --if techTree then
-    --    Shared.Message("tech tree here")
-    --    for _, upgradeId in ipairs(techTree:GetAddOnsForTechId(kTechId.AllAliens)) do
-            
-    --        if LookupTechData(upgradeId, kTechDataCategory, kTechId.None) == category then        
-    --            table.insert(upgrades, upgradeId)
-    --        end
-            
-    --    end
+    local techTree = GetTechTree()
     
+    if techTree then
+        
+        for _, upgradeId in ipairs(techTree:GetAddOnsForTechId(kTechId.AllAliens)) do
+            
+            if LookupTechData(upgradeId, kTechDataCategory, kTechId.None) == category then        
+                Shared.Message("upgrade id: " .. upgradeId)
+                table.insert(upgrades, upgradeId)
+            end
+            
+        end
+    
+    end
+    
+    
+    
+    --if category == kTechId.ShadeHive then
+    --    table.insert(upgrades, kTechId.Phantom)
+    --    table.insert(upgrades, kTechId.Aura)
     --end
     
+    --if category == kTechId.ShiftHive then
+    --    table.insert(upgrades, kTechId.Adrenaline)
+    --    table.insert(upgrades, kTechId.Celerity)
+    --end
     
-    
-    if category == kTechId.ShadeHive then
-        table.insert(upgrades, kTechId.Phantom)
-        table.insert(upgrades, kTechId.Aura)
-    end
-    
-    if category == kTechId.ShiftHive then
-        table.insert(upgrades, kTechId.Adrenaline)
-        table.insert(upgrades, kTechId.Celerity)
-    end
-    
-    if category == kTechId.CragHive then
-        table.insert(upgrades, kTechId.Regeneration)
-        table.insert(upgrades, kTechId.Carapace)
-    end
+    --if category == kTechId.CragHive then
+    --    table.insert(upgrades, kTechId.Regeneration)
+    --    table.insert(upgrades, kTechId.Carapace)
+    --end
     
     return upgrades
 end

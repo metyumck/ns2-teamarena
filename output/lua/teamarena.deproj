@@ -91,6 +91,9 @@
     <filename>TeamArenaShared.lua</filename>
   </file>
   <file>
+    <filename>TeamMessenger.lua</filename>
+  </file>
+  <file>
     <filename>TeamMixin.lua</filename>
   </file>
   <file>

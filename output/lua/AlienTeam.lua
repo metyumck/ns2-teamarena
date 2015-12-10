@@ -907,7 +907,9 @@ function AlienTeam:InitTechTree()
     self.techTree:AddBuildNode(kTechId.GorgeTunnel)
     self.techTree:AddBuildNode(kTechId.Hydra)
     self.techTree:AddBuildNode(kTechId.Clog)
-
+    
+    
+    
     self.techTree:SetComplete()
     
 end

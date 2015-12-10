@@ -595,7 +595,7 @@ local function GetHasAnyCathegoryUpgrade(cathegory)
     local upgrades = AlienUI_GetUpgradesForCategory(cathegory)
 
     for i = 1, #upgrades do
-        Shared.Message(tostring(upgrades[i]))
+        
         if AlienBuy_GetTechAvailable(upgrades[i]) then
             return true
         end        
@@ -649,7 +649,7 @@ function GUIAlienBuyMenu:_InitializeUpgradeButtons()
                 table.insertunique(self.upgradeList, techId)
             end
             
-
+            
             table.insert(self.upgradeButtons, { Background = nil, Icon = buttonIcon, TechId = techId, Category = category,
                                                 Selected = purchased, SelectedMovePercent = 0, Cost = 0, Purchased = purchased, Index = nil, 
                                                 UnselectedPosition = unselectedPosition, SelectedPosition = self.slots[i].Graphic:GetPosition()  })
@@ -1370,8 +1370,7 @@ function GUIAlienBuyMenu:_UpdateUpgrades(deltaTime)
 
 
     for i, slot in ipairs(self.slots) do
-        Shared.Message("slot cateogry " .. tostring(slot.Category))
-        Shared.Message("Gethasanyn... " .. tostring(GetHasAnyCathegoryUpgrade(slot.Category)))
+
         if categoryHasSelected[ slot.Category ] or GetHasAnyCathegoryUpgrade(slot.Category) then
             slot.Graphic:SetTexture(GUIAlienBuyMenu.kSlotTexture)
         else
@@ -1509,7 +1508,8 @@ end
 
 
 function GUIAlienBuyMenu:SendKeyEvent(key, down)
-
+    Shared.Message(tostring(key))
+    Shared.Message(tostring(down))
     local closeMenu = false
     local inputHandled = false
     

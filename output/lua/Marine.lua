@@ -246,12 +246,17 @@ function Marine:GetCanJump()
     return not self:GetIsWebbed() and ( self:GetIsOnGround() or self:GetIsOnLadder() )
 end
 
--- function Marine:InitTechTree()
---    if Server then
---        self.techTree = TechTree()
---        self.techTree:CopyDataFrom(self:GetTeam():GetTechTree())
---    end
---end
+function Marine:InitTechTree()
+    if Server then
+        self.techTree = TechTree()
+        self.techTree:CopyDataFrom(self:GetTeam():GetTechTree())
+    end
+end
+
+function Marine:OnUpdate(deltaTime)
+    Player.OnUpdate(self, deltaTime)
+    self:UpdateTechTree()
+end
 
 
 function Marine:OnInitialized()
@@ -305,9 +310,9 @@ function Marine:OnInitialized()
         self.lastPoisonAttackerId = Entity.invalidId
         
         self:AddTimedCallback(UpdateNanoArmor, 1)
-       
+        self:InitTechTree()
     elseif Client then
-    
+        
         InitMixin(self, HiveVisionMixin)
         InitMixin(self, MarineOutlineMixin)
         
@@ -350,6 +355,56 @@ end
 local blockBlackArmor = false
 if Server then
     Event.Hook("Console_blockblackarmor", function() if Shared.GetCheatsEnabled() then blockBlackArmor = not blockBlackArmor end end)
+end
+
+function Marine:GetTechTree()
+    return self.techTree
+end
+
+function Marine:UpdateTechTree()
+
+    PROFILE("Marine:UpdateTechTree")
+    
+    // Compute tech tree availability only so often because it's very slooow
+    if self.techTree and (self.timeOfLastTechTreeUpdate == nil or Shared.GetTime() > self.timeOfLastTechTreeUpdate + PlayingTeam.kTechTreeUpdateTime) then
+
+        //self.techTree:Update(self.entityTechIds, self.techIdCount)
+        
+        /*
+        local techTreeString = ""        
+        for _, techId in ipairs(self.entityTechIds) do            
+            techTreeString = techTreeString .. " " .. EnumToString(kTechId, techId) .. "(" .. ToString(self.techIdCount[techId]) .. ")"            
+        end        
+        Print("-----------team nr %s", ToString(self:GetTeamNumber()))
+        Print(techTreeString)
+        Print("------------------------")
+        */
+
+        // Send tech tree base line to players that just switched teams or joined the game        
+        
+            
+            local playerTechTree = self:GetTechTree()
+            
+            if self:GetSendTechTreeBase() then
+                Shared.Message("sending tech tree base for marine")
+                
+                playerTechTree:SendTechTreeBase(self)
+                
+                self:ClearSendTechTreeBase()
+                
+            end
+            
+   
+        
+        // Send research, availability, etc. tech node updates to team players
+        self.techTree:SendTechTreeUpdateToPlayer(self)
+        
+        self.timeOfLastTechTreeUpdate = Shared.GetTime()
+        
+
+        
+    end
+    
 end
 
 function Marine:GetArmorLevel()
