@@ -13,7 +13,28 @@ end
 
 local networkVars = {}
 
+function VIP:GetPlayerStatusDesc()
 
+    local status = kPlayerStatus.Void
+    
+    if (self:GetIsAlive() == false) then
+        return kPlayerStatus.Dead
+    end
+    
+    local weapon = self:GetWeaponInHUDSlot(1)
+    if (weapon) then
+        
+        return kPlayerStatus.VIP
+        
+    end
+    
+    return status
+end
+
+
+function VIP:GetIsVIP()
+    return true
+end
 
 function UpdateNanoArmor(self)
     //VIP always has nanoarmor to identify him

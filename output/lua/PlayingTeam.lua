@@ -890,6 +890,7 @@ function PlayingTeam:PrintWorldTextForTeamInRange(messageType, data, position, r
 end
 
 function PlayingTeam:GetTechTree()
+    
     return self.techTree
 end
 

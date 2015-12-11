@@ -247,7 +247,7 @@ function Marine:GetCanJump()
 end
 
 function Marine:InitTechTree()
-    if Server then
+    if Server and self:GetTeamType() == 1 then
         self.techTree = TechTree()
         self.techTree:CopyDataFrom(self:GetTeam():GetTechTree())
     end
@@ -690,6 +690,8 @@ function Marine:GetPlayerStatusDesc()
             return kPlayerStatus.Shotgun
         elseif (weapon:isa("Flamethrower")) then
             return kPlayerStatus.Flamethrower
+        elseif (weapon:isa("RailPistol")) then
+            return kPlayerStatus.VIP
         end
     end
     

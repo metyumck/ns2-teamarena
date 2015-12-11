@@ -883,7 +883,7 @@ function PlayerUI_GetCrosshairY()
             
             if mapname == Rifle.kMapName or mapname == HeavyRifle.kMapName then 
                 index = 0
-            elseif mapname == Pistol.kMapName then
+            elseif mapname == Pistol.kMapName or mapname == RailPistol.kMapName then
                 index = 1
             elseif mapname == Shotgun.kMapName then
                 index = 3
@@ -3395,10 +3395,21 @@ function PlayerUI_GetTeamNumber()
 
 end
 
+function PlayerUI_GetGameBuyTime()
+
+end
+
 function PlayerUI_GetHasGameStarted()
 
      local player = Client.GetLocalPlayer()
      return player and player:GetGameStarted()
+     
+end
+
+function PlayerUI_GetHasGameBuyTime()
+
+     local player = Client.GetLocalPlayer()
+     return player and player:GetGameBuyTime()
      
 end
 

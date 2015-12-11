@@ -329,7 +329,7 @@ kWeapons1DamageScalar = 1 + kDamagePerUpgradeScalar
 kWeapons2DamageScalar = 1 + kDamagePerUpgradeScalar * 2
 kWeapons3DamageScalar = 1 + kDamagePerUpgradeScalar * 3
 
-kNanoShieldDamageReductionDamage = 0.68
+kNanoShieldDamageReductionDamage = 0.5
 
 // ALIEN DAMAGE
 kBiteDamage = 75
@@ -556,14 +556,14 @@ kHydraBuildTime = 13
 kCystBuildTime = 5
 
 kSkulkGestateTime = 1
-kGorgeGestateTime = 2
-kLerkGestateTime = 3
-kFadeGestateTime = 4
+kGorgeGestateTime = 1
+kLerkGestateTime = 1
+kFadeGestateTime = 1
 kOnosGestateTime = 5
 
 kEggGestateTime = 45
 
-kEvolutionGestateTime = 3
+kEvolutionGestateTime = 0.5
 
 // alien ability research cost / time
 

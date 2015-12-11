@@ -21,6 +21,7 @@ local networkVars =
     numPlayersTotal = "integer",
     marineWins = "integer",
     alienWins = "integer",
+    currentVIPSteamId = "integer",
 }
 
 function GameInfo:OnCreate()
@@ -39,6 +40,7 @@ function GameInfo:OnCreate()
         self.marineWins = 0
         self.alienWins = 0
         self.listOfMarinePlayers = {}
+        self.currentVIPSteamId = 0
         
     end
     
@@ -58,6 +60,10 @@ end
 
 function GameInfo:GetAveragePlayerSkill()
     return self.averagePlayerSkill
+end
+
+function GameInfo:GetCurrentVIPSteamID()
+    return self.currentVIPSteamId
 end
 
 function GameInfo:GetNumPlayersTotal()
@@ -104,6 +110,10 @@ if Server then
     
     function GameInfo:SetAlienWins( alienWins )
         self.alienWins = alienWins
+    end
+    
+    function GameInfo:SetCurrentVIPSteamID( currentVIPSteamID )
+        self.currentVIPSteamId = currentVIPSteamID
     end
     
 end

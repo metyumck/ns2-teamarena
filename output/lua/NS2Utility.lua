@@ -2327,6 +2327,7 @@ function BuildClassToGrid()
 
     ClassToGrid["ReadyRoomPlayer"] = { 1, 2 }
     ClassToGrid["Marine"] = { 1, 2 }
+    ClassToGrid["VIP"] = { 2, 8 }
     ClassToGrid["Exo"] = { 2, 2 }
     ClassToGrid["JetpackMarine"] = { 3, 2 }
     ClassToGrid["Exo"] = { 2, 2 }

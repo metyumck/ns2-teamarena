@@ -221,6 +221,7 @@ local networkVars =
     resources = "private float (0 to " .. kMaxPersonalResources .." by 0.01)",
     teamResources = "private float (0 to " .. kMaxTeamResources .." by 0.01)",
     gameStarted = "private boolean",
+    gameBuytime = "private boolean",
     countingDown = "private boolean",
     frozen = "private boolean",
     
@@ -1954,6 +1955,10 @@ function Player:GetSecondaryAttackLastFrame()
     return self.secondaryAttackLastFrame
 end
 
+function Player:GetIsVIP()
+    return false
+end
+
 function Player:GetIsAbleToUse()
     return self:GetIsAlive()
 end
@@ -1995,15 +2000,23 @@ function Player:HandleButtons(input)
         self.buyLastFrame = self.buyLastFrame or false
         -- Player is bringing up the buy menu (don't toggle it too quickly)
         local buyButtonPressed = bit.band(input.commands, Move.Buy) ~= 0
-        if not self.buyLastFrame and buyButtonPressed and Shared.GetTime() > (self.timeLastMenu + 0.3) then
-        
-            self:Buy()
+        if not self.buyLastFrame and buyButtonPressed and Shared.GetTime() > (self.timeLastMenu + 0.3) and Client.GetLocalPlayer():GetGameBuyTime() then
+            if Client.GetLocalPlayer():GetTeamNumber() == 2 then   
+                self:Buy()
+            end
             self.timeLastMenu = Shared.GetTime()
             
-            if Client.GetLocalPlayer():GetTeamNumber() == 1 then    
+            local entityList = Shared.GetEntitiesWithClassname("GameInfo")
+            if entityList:GetSize() == 0 then
+                return false
+            end
 
+            local gameInfo = entityList:GetEntityAtIndex(0)
+            
+            if Client.GetLocalPlayer():GetTeamNumber() == 1 and gameInfo:GetCurrentVIPSteamID() ~= Client.GetSteamId() then    
+            
                 
-                Shared.Message("Opening buy menu")
+
                 self:BuyMenu()
                 
             end
@@ -2263,6 +2276,10 @@ end
 
 function Player:GetGameStarted()
     return self.gameStarted
+end
+
+function Player:GetGameBuyTime()
+    return self.gameBuytime
 end
 
 function Player:Drop(weapon, ignoreDropTimeLimit)

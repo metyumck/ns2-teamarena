@@ -344,10 +344,13 @@ function Player:OnUpdatePlayer(deltaTime)
     
     local gamerules = GetGamerules()
     self.gameStarted = gamerules:GetGameStarted()
+ 
     if self:GetTeamNumber() == kTeam1Index or self:GetTeamNumber() == kTeam2Index then
         self.countingDown = gamerules:GetCountingDown()
+        self.gameBuytime = gamerules:GetBuyTime()
     else
         self.countingDown = false
+        self.gameBuytime = false
     end
     
 end

@@ -33,15 +33,12 @@ local kGameStartMessageInterval = 10
 //Variables for keeping track of game state. Need to refactor as it seem k variables are constants :(
 local roundCount = 1
 local kRoundLimit = 13
-local kRoundRecord = {}
+
 local marineWins = 0
 local alienWins = 0
 local kBuyTimeLength = 10
 local kRoundLength = 120
 
-for i=0, kRoundLimit - 1 do
-   kRoundRecord[i] = 0
-end
 
 local kMaxWorldSoundDistance = 30
 
@@ -408,13 +405,21 @@ if Server then
         
         local chosenOne = nil
         
+        
         local playerList = self.team1:GetPlayers()
 
         for index, player in pairs(playerList) do
-            
-            
-            chosenOne = player
-     
+            local isPlayerInList = false
+            for index, pastVIPSteamId in ipairs(self.listOfPastVIPs) do
+                
+                if pastVIPSteamId and pastVIPSteamId == player:GetSteamId() then
+                    isPlayerInList = true
+                end   
+                
+            end
+            if not isPlayerInList then
+                chosenOne = player
+            end
         end
         
         return chosenOne
@@ -447,9 +452,26 @@ if Server then
             
             //Find the VIP :)
             local VIPPlayer = self:FindTheChosenOne()
+            self.gameInfo:SetCurrentVIPSteamID(VIPPlayer:GetSteamId())
             
-            //Add player to the list of past VIPs so they are not chosen next round
-            table.insert(self.listOfPastVIPs, VIPPlayer)
+            //Add player steamId to the list of past VIPs so they are not chosen next round
+            Shared.Message("Adding player " .. VIPPlayer:GetSteamId() .. " to past VIP list")
+            table.insert(self.listOfPastVIPs, VIPPlayer:GetSteamId())
+            
+            local listOfVIPsCount = 0
+            
+            Shared.Message("Current list of past VIPs")
+            for index, vip in pairs(self.listOfPastVIPs) do
+                listOfVIPsCount = listOfVIPsCount + 1
+                Shared.Message(tostring(vip))
+            end
+            
+            if listOfVIPsCount ~= 0 then
+                if self.team1:GetNumPlayers() <= listOfVIPsCount then
+                    Shared.Message("Clearing past VIP list")
+                    self.listOfPastVIPs = {}
+                end
+            end
 
             //Respawn the player 
             self.team1:RespawnVIP(VIPPlayer)
@@ -1317,15 +1339,9 @@ if Server then
             self.team1Lost = nil
             self.team2Lost = nil
             self.timeDrawWindowEnds = nil
-            
-            //Clear RoundRecord and reset alien and marine wins
             marineWins = 0
             alienWins = 0
-            roundCount = 1
-            for i=0, kRoundLimit - 1 do
-               kRoundRecord[i] = 0
-            end
-            
+			roundCount = 1
             -- Automatically end any performance logging when the round has ended.
             Shared.ConsoleCommand("p_endlog")
 
@@ -1334,6 +1350,7 @@ if Server then
                 self.playerRanking:EndGame(winningTeam)
             end
             TournamentModeOnGameEnd()
+            
 
         end
         
@@ -1584,7 +1601,7 @@ if Server then
             local team1Count = self.team1:GetNumPlayers()
             local team2Count = self.team2:GetNumPlayers()
             
-            if ((team1Count >= 2 and team2Count >= 2) or Shared.GetCheatsEnabled()) and (not self.tournamentMode or self.teamsReady) then
+            if ((team1Count >= 1 and team2Count >= 1) or Shared.GetCheatsEnabled()) and (not self.tournamentMode or self.teamsReady) then
             
                 if self:GetGameState() == kGameState.NotStarted then
                     self:SetGameState(kGameState.PreGame)
@@ -1682,14 +1699,10 @@ if Server then
     function NS2Gamerules:CheckRoundEnd()
         if self:GetGameStarted() and not Shared.GetCheatsEnabled() then
             
-            if Shared.GetTime() > (self.roundStartTime + kRoundLength - 90) and Shared.GetTime() < (self.roundStartTime + kRoundLength - 88) then
-                Shared.Message("90 seconds remain")
-            end
-            
             //Aliens win if the round time runs down
             if Shared.GetTime() > self.roundStartTime + kRoundLength then
                 
-                Server.SendNetworkMessage("Chat", BuildChatMessage(false, "Team Arena Bot", -1, kTeamReadyRoom, kNeutralTeamType, "Aliens win round " .. roundCount .. ". Starting round " .. roundCount + 1 ), true)
+                Server.SendNetworkMessage("Chat", BuildChatMessage(false, "Extraction", -1, kTeamReadyRoom, kNeutralTeamType, "Aliens win round " .. roundCount .. ". Starting round " .. roundCount + 1 ), true)
                 
                 self:CheckGameEnd()
                 
@@ -1700,7 +1713,7 @@ if Server then
             
             
             elseif (self.team1:GetHasTeamLostRound() and (self.team1:GetNumPlayers() > 0 and self.team2:GetNumPlayers() > 0)) and not self:GetHasVIPReachedTechpoint() or self:GetIsVIPDead() then
-                Server.SendNetworkMessage("Chat", BuildChatMessage(false, "Team Arena Bot", -1, kTeamReadyRoom, kNeutralTeamType, "Aliens win round " .. roundCount .. ". Starting round " .. roundCount + 1 ), true)
+                Server.SendNetworkMessage("Chat", BuildChatMessage(false, "Extraction", -1, kTeamReadyRoom, kNeutralTeamType, "Aliens win round " .. roundCount .. ". Starting round " .. roundCount + 1 ), true)
                 self:CheckGameEnd()
                 
                 roundCount = roundCount + 1
@@ -1710,7 +1723,7 @@ if Server then
                 
                 
             elseif (self.team2:GetHasTeamLostRound() and (self.team1:GetNumPlayers() > 0 and self.team2:GetNumPlayers() > 0)) and not self:GetIsVIPDead() or self:GetHasVIPReachedTechpoint() then
-                Server.SendNetworkMessage("Chat", BuildChatMessage(false, "Team Arena Bot", -1, kTeamReadyRoom, kNeutralTeamType, "Marines win round " .. roundCount .. ". Starting round " .. roundCount + 1 ), true)
+                Server.SendNetworkMessage("Chat", BuildChatMessage(false, "Extraction", -1, kTeamReadyRoom, kNeutralTeamType, "Marines win round " .. roundCount .. ". Starting round " .. roundCount + 1 ), true)
                 self:CheckGameEnd()
                 
                 roundCount = roundCount + 1
@@ -1780,6 +1793,10 @@ if Server then
         return self:GetGameState() == kGameState.Countdown
     end
     
+    function NS2Gamerules:GetBuyTime()
+        return self:GetGameState() == kGameState.BuyTime
+    end
+    
     local function StartBuytime(self)
         
         self:BeginNewRound()
@@ -1826,7 +1843,7 @@ if Server then
             if self.lastBuyTimePlayed ~= buyTimeSeconds and (buyTimeSeconds < kBuyTimeLength) then
                 
                 self.lastBuyTimePlayed = buyTimeSeconds
-                Server.SendNetworkMessage("Chat", BuildChatMessage(false, "Team Arena Bot", -1, kTeamReadyRoom, kNeutralTeamType, "Buy time remaining: " .. (buyTimeSeconds + 1) .. " seconds." ), true)
+                Server.SendNetworkMessage("Chat", BuildChatMessage(false, "Extraction", -1, kTeamReadyRoom, kNeutralTeamType, "Buy time remaining: " .. (buyTimeSeconds + 1) .. " seconds." ), true)
                 Shared.Message(tostring(self.team1:GetTeamResources()))
                
             end
