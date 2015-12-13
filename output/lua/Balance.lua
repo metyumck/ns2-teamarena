@@ -463,9 +463,9 @@ kWhipBombardROF = 6
 // SPAWN TIMES
 kMarineRespawnTime = 9
 
-kAlienSpawnTime = 1000
-kEggGenerationRate = 1000
-kAlienEggsPerHive = 0
+kAlienSpawnTime = 10
+kEggGenerationRate = 13
+kAlienEggsPerHive = 3
 
 // BUILD/RESEARCH TIMES
 kRecycleTime = 12

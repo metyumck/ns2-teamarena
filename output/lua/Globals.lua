@@ -206,7 +206,7 @@ kAlertType = enum( {'Attack', 'Info', 'Request'} )
 kLightMode = enum( {'Normal', 'NoPower', 'LowPower', 'Damaged'} )
 
 // Game state
-kGameState = enum( {'NotStarted', 'PreGame', 'Countdown', 'BuyTime', 'Started', 'Team1Won', 'Team2Won', 'Draw'} )
+kGameState = enum( {'NotStarted', 'PreGame', 'Countdown', 'BuyTime', 'Started', 'Team1Won', 'Team2Won', 'Draw', 'Team1WonRound', 'Team2WonRound'} )
 
 // Don't allow commander to build structures this close to attach points or other structures
 kBlockAttachStructuresRadius = 3

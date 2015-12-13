@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <project>
   <file>
+    <filename>Alien.lua</filename>
+  </file>
+  <file>
     <filename>AlienBuy_Client.lua</filename>
   </file>
   <file>
@@ -61,6 +64,9 @@
     <filename>NS2Utility.lua</filename>
   </file>
   <file>
+    <filename>NetworkMessages_Client.lua</filename>
+  </file>
+  <file>
     <filename>Player.lua</filename>
   </file>
   <file>
@@ -74,6 +80,9 @@
   </file>
   <file>
     <filename>Weapons\Marine\RailPistol.lua</filename>
+  </file>
+  <file>
+    <filename>Scoreboard.lua</filename>
   </file>
   <file>
     <filename>Team.lua</filename>

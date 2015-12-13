@@ -66,7 +66,7 @@ kArmoryWeaponAttachRange = 10
 // Minimum distance that initial IP spawns away from team location
 kInfantryPortalMinSpawnDistance = 4
 kItemStayTime = 30    // NS1
-kWeaponStayTime = 25
+kWeaponStayTime = 2
 
 // For power points
 kMarineRepairHealthPerSecond = 600

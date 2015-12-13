@@ -11,7 +11,7 @@ kTeamMessageTypes = enum({ 'GameStarted', 'PowerLost', 'PowerRestored', 'Eject',
                            'HiveConstructed', 'HiveLowHealth', 'HiveKilled',
                            'CommandStationUnderAttack', 'IPUnderAttack', 'HiveUnderAttack',
                            'PowerPointUnderAttack', 'Beacon', 'NoCommander', 'TeamsUnbalanced',
-                           'TeamsBalanced', 'GameStartCommanders' })
+                           'TeamsBalanced', 'GameStartCommanders', 'Team1WonRound', 'Team2WonRound' })
 
 local kTeamMessages = { }
 
@@ -64,6 +64,11 @@ kTeamMessages[kTeamMessageTypes.TeamsUnbalanced] = { text = { [kMarineTeamType] 
 kTeamMessages[kTeamMessageTypes.TeamsBalanced] = { text = { [kMarineTeamType] = "TEAMS_BALANCED", [kAlienTeamType] = "TEAMS_BALANCED" } }
 
 kTeamMessages[kTeamMessageTypes.GameStartCommanders] = { text = { [kMarineTeamType] = "Game will start when both sides have atleast 2 players.", [kAlienTeamType] = "Game will start when both sides have atleast 2 players." } }
+
+kTeamMessages[kTeamMessageTypes.Team1WonRound] = { text = { [kMarineTeamType] = "Marines win the round!", [kAlienTeamType] = "Marines win the round!" } }
+
+kTeamMessages[kTeamMessageTypes.Team2WonRound] = { text = { [kMarineTeamType] = "Aliens win the round!", [kAlienTeamType] = "Aliens win the round!" } }
+
 
 
 // Silly name but it fits the convention.

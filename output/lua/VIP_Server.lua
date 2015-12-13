@@ -8,3 +8,4 @@ function VIP:InitWeapons()
     
     self:SetActiveWeapon(RailPistol.kMapName)
 end
+
