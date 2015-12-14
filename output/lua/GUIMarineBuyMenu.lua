@@ -429,7 +429,6 @@ function GUIMarineBuyMenu:_InitializeItemButtons()
         kTechId.ClusterGrenade,
         kTechId.GasGrenade,
         kTechId.PulseGrenade,
-        kTechId.Armor1,
         kTechId.Armor2,
         kTechId.Armor3,
     }

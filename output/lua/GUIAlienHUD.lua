@@ -206,6 +206,16 @@ function GUIAlienHUD:Initialize()
     GUIMakeFontScale(self.alienScore)
     self.alienScore:AddAsChildTo(self.roundscores)
     
+    self.roundTimer = self:CreateAnimatedTextItem()
+    self.roundTimer:SetFontName(Fonts.kAgencyFB_Medium)
+    self.roundTimer:SetAnchor(GUIItem.Middle, GUIItem.Center)
+    self.roundTimer:SetTextAlignmentX(GUIItem.Align_Center)
+    self.roundTimer:SetTextAlignmentY(GUIItem.Align_Center)
+    self.roundTimer:SetPosition(GUIScale(Vector(0, -8, 0)))
+    self.roundTimer:SetColor(Color(1, 1, 1, 1))
+    GUIMakeFontScale(self.roundTimer)
+    self.roundTimer:AddAsChildTo(self.roundscores)
+    
     self.resourceBackground = self:CreateAnimatedGraphicItem()
     self.resourceBackground:SetIsScaling(false)
     self.resourceBackground:SetSize(Vector(Client.GetScreenWidth(), Client.GetScreenHeight(), 0))
@@ -263,10 +273,11 @@ function GUIAlienHUD:Reset()
    
 end
 
-function GUIAlienHUD:SetScore(team1Score, team2Score)
+function GUIAlienHUD:SetScore(team1Score, team2Score, currentTimeLeft)
 
     self.marineScore:SetText(tostring(team1Score))
     self.alienScore:SetText(tostring(team2Score))
+    self.roundTimer:SetText(tostring(currentTimeLeft))
 
 end
 
@@ -767,7 +778,8 @@ function GUIAlienHUD:Update(deltaTime)
     //Update marinescore and alienscore
     local marineScore = PlayerUI_GetMarineWins()
     local alienScore = PlayerUI_GetAlienWins()
-    self:SetScore(tostring(marineScore), tostring(alienScore))
+    local roundTime = PlayerUI_GetRoundTimer()
+    self:SetScore(tostring(marineScore), tostring(alienScore), tostring(roundTime) )
     
     // updates animations
     GUIAnimatedScript.Update(self, deltaTime)

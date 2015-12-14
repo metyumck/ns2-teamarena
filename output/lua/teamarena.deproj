@@ -43,6 +43,9 @@
     <filename>Globals.lua</filename>
   </file>
   <file>
+    <filename>InfantryPortal.lua</filename>
+  </file>
+  <file>
     <filename>Marine.lua</filename>
   </file>
   <file>

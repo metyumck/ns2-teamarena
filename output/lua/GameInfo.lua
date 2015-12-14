@@ -22,6 +22,8 @@ local networkVars =
     marineWins = "integer",
     alienWins = "integer",
     currentVIPSteamId = "integer",
+    currentTimeLeft = "float",
+
 }
 
 function GameInfo:OnCreate()
@@ -41,6 +43,8 @@ function GameInfo:OnCreate()
         self.alienWins = 0
         self.listOfMarinePlayers = {}
         self.currentVIPSteamId = 0
+        self.currentTimeLeft = 0
+        
         
     end
     
@@ -86,7 +90,16 @@ function GameInfo:GetIsGatherReady()
     return self.isGatherReady
 end
 
+function GameInfo:GetCurrentTimeLeft()
+    return self.currentTimeLeft
+end
+
 if Server then
+
+    function GameInfo:SetCurrentTimeLeft(timeLeft)
+        self.currentTimeLeft = timeLeft
+    end
+
 
     function GameInfo:SetStartTime(startTime)
         self.startTime = startTime

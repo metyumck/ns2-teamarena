@@ -137,8 +137,8 @@ kWeapons2ResearchCost = 30
 kWeapons3ResearchCost = 40
 
 kArmor1ResearchCost = 20
-kArmor2ResearchCost = 30
-kArmor3ResearchCost = 40
+kArmor2ResearchCost = 12
+kArmor3ResearchCost = 20
 kNanoArmorResearchCost = 20
 
 kRifleUpgradeTechResearchCost = 10
@@ -174,9 +174,9 @@ kEvolveBombardCost = 5
 
 kGorgeCost = 8
 kGorgeEggCost = 15
-kLerkCost = 15
+kLerkCost = 17
 kLerkEggCost = 30
-kFadeCost = 25
+kFadeCost = 27
 kFadeEggCost = 70
 kOnosCost = 2000
 kOnosEggCost = 100
@@ -461,10 +461,10 @@ kWhipBombardROF = 6
 
 
 // SPAWN TIMES
-kMarineRespawnTime = 9
+kMarineRespawnTime = 1
 
-kAlienSpawnTime = 10
-kEggGenerationRate = 13
+kAlienSpawnTime = 5
+kEggGenerationRate = 3
 kAlienEggsPerHive = 3
 
 // BUILD/RESEARCH TIMES

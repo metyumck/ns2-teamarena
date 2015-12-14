@@ -10,7 +10,7 @@
 function GetHasTech(callingEntity, techId, silentError)
 
     if Client then
-        Shared.Message(tostring(techId))
+       
         
         local techTree = GetTechTree()
         if(techTree ~= nil) then

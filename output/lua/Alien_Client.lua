@@ -723,7 +723,7 @@ function AlienUI_GetUpgradesForCategory(category)
         for _, upgradeId in ipairs(techTree:GetAddOnsForTechId(kTechId.AllAliens)) do
             
             if LookupTechData(upgradeId, kTechDataCategory, kTechId.None) == category then        
-                Shared.Message("upgrade id: " .. upgradeId)
+          
                 table.insert(upgrades, upgradeId)
             end
             

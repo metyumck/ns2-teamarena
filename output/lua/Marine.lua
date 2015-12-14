@@ -256,6 +256,7 @@ end
 function Marine:OnUpdate(deltaTime)
     Player.OnUpdate(self, deltaTime)
     self:UpdateTechTree()
+ 
 end
 
 
@@ -409,7 +410,7 @@ end
 
 function Marine:GetArmorLevel()
 
-    local armorLevel = 0
+    local armorLevel = 1
     local techTree = self.techTree
 
     if techTree then
@@ -434,7 +435,7 @@ end
 
 function Marine:GetWeaponLevel()
 
-    local weaponLevel = 0
+    local weaponLevel = 1
     local techTree = self.techTree
 
     if techTree then
@@ -980,6 +981,24 @@ function Marine:OnProcessMove(input)
         if not self:GetIsInCombat() and self.hasNanoArmor then            
             self:SetArmor(self:GetArmor() + input.time * kNanoArmorHealPerSecond, true)            
         end
+        
+        //replenish health and ammo out of combat
+        if not self:GetIsInCombat() then
+            self:AddHealth(1, false, true)
+            for i = 0, self:GetNumChildren() - 1 do
+    
+                local child = self:GetChildAtIndex(i)
+                if child:isa("ClipWeapon") then
+                
+                    if child:GiveAmmo(AmmoPack.kNumClips, false) then
+                        consumedPack = true
+                    end
+                    
+                end
+                
+            end  
+        end
+   
         
     end
     

@@ -8,18 +8,4 @@
     <local_path></local_path>
     <aux_project_path></aux_project_path>
   </scc>
-  <files>
-    <file>
-      <filename>GameInfo.lua</filename>
-      <breakpoint>
-        <line>116</line>
-      </breakpoint>
-    </file>
-    <file>
-      <filename>NS2Gamerules.lua</filename>
-      <breakpoint>
-        <line>414</line>
-      </breakpoint>
-    </file>
-  </files>
 </project>

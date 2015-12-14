@@ -251,7 +251,7 @@ local function ExecuteShot(self, startPoint, endPoint, player)
     local hitPointOffset = trace.normal * 0.3
     local direction = (endPoint - startPoint):GetUnit()
     local damage = kRailPistolDamage + math.min(1, (Shared.GetTime() - self.timeChargeStarted) / kChargeTime) * kRailPistolChargeDamage
-    Shared.Message("Boom! Railpistol damage: " .. tostring(damage))
+
     local extents = GetDirectedExtentsForDiameter(direction, kBulletSize)
     
     if trace.fraction < 1 then

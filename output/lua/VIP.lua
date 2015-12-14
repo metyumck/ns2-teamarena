@@ -10,7 +10,9 @@ elseif Client then
     Script.Load("lua/VIP_Client.lua")
 end
 
-local networkVars = {}
+local networkVars = {
+
+}
 
 
 
@@ -53,7 +55,30 @@ end
 function VIP:OnInitialized()
   
     Marine.OnInitialized(self)
-    self:ActivateNanoShield()
+    
+    
+    self:AddTimedCallback(ActivateNanoShieldWrapper, 2)
+end
+
+
+
+
+
+
+function VIP:OnDestroy()
+
+    Marine.OnDestroy(self)
+    
+    
+    
+end
+
+function VIP:HandleButtons(input)
+
+    PROFILE("VIP:HandleButtons")
+    
+    Marine.HandleButtons(self, input)
+    
     
 end
 

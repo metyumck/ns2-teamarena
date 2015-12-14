@@ -1508,8 +1508,7 @@ end
 
 
 function GUIAlienBuyMenu:SendKeyEvent(key, down)
-    Shared.Message(tostring(key))
-    Shared.Message(tostring(down))
+
     local closeMenu = false
     local inputHandled = false
     

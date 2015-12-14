@@ -413,8 +413,6 @@ function Player:UpdateTechTree()
 
     PROFILE("Player:UpdateTechTree")
     
-    Shared.Message("Is techtree a thing? " .. tostring(self.techTree))
-    Shared.Message(tostring((self.timeOfLastTechTreeUpdate == nil or Shared.GetTime() > self.timeOfLastTechTreeUpdate + PlayingTeam.kTechTreeUpdateTime)))
     // Compute tech tree availability only so often because it's very slooow
     if self.techTree and (self.timeOfLastTechTreeUpdate == nil or Shared.GetTime() > self.timeOfLastTechTreeUpdate + PlayingTeam.kTechTreeUpdateTime) then
         

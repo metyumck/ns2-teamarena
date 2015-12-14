@@ -282,6 +282,17 @@ function PlayerUI_GetAlienWins()
     return 0
 end
 
+function PlayerUI_GetRoundTimer()
+    local entityList = Shared.GetEntitiesWithClassname("GameInfo")
+    if entityList:GetSize() > 0 then
+    
+        local gameInfo = entityList:GetEntityAtIndex(0)
+        return gameInfo:GetCurrentTimeLeft() 
+    end
+    
+    return 0
+end
+
 function PlayerUI_GetOrderPath()
 
     local player = Client.GetLocalPlayer()
