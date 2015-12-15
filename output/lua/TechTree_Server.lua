@@ -735,7 +735,16 @@ end
 
 // Utility functions
 function GetHasTech(callingEntity, techId, silenceError)
-
+    if callingEntity ~= nil and callingEntity:isa("Marine") then
+        local techTree = callingEntity:GetTechTree()
+        if techTree ~= nil then
+            if techId == kTechId.Weapons1 then
+                return true
+            else 
+                return techTree:GetHasTech(techId, silenceError)
+            end
+        end
+    end
     if callingEntity ~= nil and HasMixin(callingEntity, "Team") then
         
         local team = GetGamerules():GetTeam(callingEntity:GetTeamNumber())

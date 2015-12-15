@@ -2980,15 +2980,15 @@ function PlayerUI_GetRecentPurchaseable()
 end
 
 -- returns 0 - 3
-function PlayerUI_GetArmorLevel()
-    local armorLevel = 0
+function PlayerUI_GetArmorLevel(researched)
+    local armorLevel = 1
     
     
-    if Client.GetLocalPlayer().gameStarted then
+    if Client.GetLocalPlayer().gameBuytime or Client.GetLocalPlayer().gameStarted then
         
         local techTree = GetTechTree()
         
-       
+     
         if techTree then
             
             local armor3Node = techTree:GetTechNode(kTechId.Armor3)
@@ -2996,7 +2996,7 @@ function PlayerUI_GetArmorLevel()
             local armor1Node = techTree:GetTechNode(kTechId.Armor1)
             
             if researched then
-        
+
                 if armor3Node and armor3Node:GetResearched() then
                     armorLevel = 3
                 elseif armor2Node and armor2Node:GetResearched()  then
@@ -3006,7 +3006,7 @@ function PlayerUI_GetArmorLevel()
                 end
             
             else
-            
+
                 if armor3Node and armor3Node:GetHasTech() then
                     armorLevel = 3
                 elseif armor2Node and armor2Node:GetHasTech()  then
@@ -3025,9 +3025,9 @@ function PlayerUI_GetArmorLevel()
 end
 
 function PlayerUI_GetWeaponLevel(researched)
-    local weaponLevel = 0
+    local weaponLevel = 1
     
-    if Client.GetLocalPlayer().gameStarted then
+    if Client.GetLocalPlayer().gameBuytime or Client.GetLocalPlayer().gameStarted then
     
         local techTree = GetTechTree()
     

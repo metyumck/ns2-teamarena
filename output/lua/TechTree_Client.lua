@@ -11,8 +11,15 @@ function GetHasTech(callingEntity, techId, silentError)
 
     if Client then
        
-        
-        local techTree = GetTechTree()
+        //this change may break aliens
+
+        if callingEntity:isa("Marine") then
+  
+            local techTree = callingEntity:GetTechTree()
+        else
+
+            local techTree = GetTechTree()
+        end
         if(techTree ~= nil) then
         
             return techTree:GetHasTech(techId, silentError)

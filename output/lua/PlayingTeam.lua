@@ -694,6 +694,15 @@ function PlayingTeam:ReplaceRespawnPlayer(player, origin, angles, mapName)
         newPlayer:ClearUpgrades()
     end
     
+    if newPlayer:isa("Marine") then
+  
+        
+        local techTree = newPlayer:GetTechTree()
+        techTree:SendTechTreeBase(newPlayer)
+        
+        
+    end
+    
     return (newPlayer ~= nil), newPlayer
     
 end

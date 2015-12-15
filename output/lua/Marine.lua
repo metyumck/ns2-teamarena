@@ -412,7 +412,7 @@ function Marine:GetArmorLevel()
 
     local armorLevel = 1
     local techTree = self.techTree
-
+ 
     if techTree then
     
         local armor3Node = techTree:GetTechNode(kTechId.Armor3)

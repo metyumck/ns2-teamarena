@@ -74,7 +74,7 @@ function RailPistol:GetSprintAllowed()
 end
 
 function RailPistol:GetHUDSlot()
-    return kNoWeaponSlot
+    return kPrimaryWeaponSlot
 end
 
 function RailPistol:GetWeight()

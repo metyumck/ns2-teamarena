@@ -423,7 +423,6 @@ function GUIMarineBuyMenu:_InitializeItemButtons()
     self.itemButtons = { }
     
     local itemTechIdList = {   
-        kTechId.LayMines, 
         kTechId.Shotgun,
         kTechId.Welder,
         kTechId.ClusterGrenade,
@@ -431,6 +430,8 @@ function GUIMarineBuyMenu:_InitializeItemButtons()
         kTechId.PulseGrenade,
         kTechId.Armor2,
         kTechId.Armor3,
+        kTechId.Weapons2,
+        kTechId.Weapons3
     }
     local selectorPosX = -GUIMarineBuyMenu.kSelectorSize.x + GUIMarineBuyMenu.kPadding
     local fontScaleVector = GUIScale(Vector(0.8, 0.8, 0))

@@ -133,12 +133,12 @@ kDualRailgunTechResearchCost = 30
 
 kCatPackTechResearchCost = 15
 kWeapons1ResearchCost = 20
-kWeapons2ResearchCost = 30
-kWeapons3ResearchCost = 40
+kWeapons2ResearchCost = 12
+kWeapons3ResearchCost = 18
 
 kArmor1ResearchCost = 20
 kArmor2ResearchCost = 12
-kArmor3ResearchCost = 20
+kArmor3ResearchCost = 18
 kNanoArmorResearchCost = 20
 
 kRifleUpgradeTechResearchCost = 10

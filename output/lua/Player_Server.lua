@@ -653,7 +653,7 @@ function Player:ProcessBuyAction(techIds)
             techNode:SetHasTech(true)
             techTree:SetTechNodeChanged(techNode)
             techTree:SetTechChanged() 
-            self:UpdateTechTree()
+            techTree:SendTechTreeUpdateToPlayer(self)
             self:AddResources(-totalCost)
             return true
         end
