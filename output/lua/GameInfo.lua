@@ -18,7 +18,9 @@ local networkVars =
     startTime = "time",
     averagePlayerSkill = "integer",
     isGatherReady = "boolean",
+    rookieMode = "boolean",
     numPlayersTotal = "integer",
+    isDedicated = "boolean",
     marineWins = "integer",
     alienWins = "integer",
     currentVIPSteamId = "integer",
@@ -39,6 +41,7 @@ function GameInfo:OnCreate()
         self.startTime = 0
         self.averagePlayerSkill = 0
         self.numPlayersTotal = 0
+	self.isDedicated = Server.IsDedicated()
         self.marineWins = 0
         self.alienWins = 0
         self.listOfMarinePlayers = {}
@@ -90,6 +93,10 @@ function GameInfo:GetIsGatherReady()
     return self.isGatherReady
 end
 
+function GameInfo:GetRookieMode()
+    return self.rookieMode
+end
+
 function GameInfo:GetCurrentTimeLeft()
     return self.currentTimeLeft
 end
@@ -115,6 +122,10 @@ if Server then
     
     function GameInfo:SetNumPlayersTotal( numPlayersTotal )
         self.numPlayersTotal = numPlayersTotal
+    end
+
+    function GameInfo:SetRookieMode(mode)
+        self.rookieMode = mode
     end
     
     function GameInfo:SetMarineWins( marineWins )

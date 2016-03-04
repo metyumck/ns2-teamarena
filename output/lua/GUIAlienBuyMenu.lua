@@ -1,12 +1,12 @@
-// ======= Copyright (c) 2003-2011, Unknown Worlds Entertainment, Inc. All rights reserved. =======
-//
-// lua\GUIAlienBuyMenu.lua
-//
-// Created by: Brian Cronin (brianc@unknownworlds.com)
-//
-// Manages the alien buy/evolve menu.
-//
-// ========= For more information, visit us at http://www.unknownworlds.com =====================
+-- ======= Copyright (c) 2003-2011, Unknown Worlds Entertainment, Inc. All rights reserved. =======
+--
+-- lua\GUIAlienBuyMenu.lua
+--
+-- Created by: Brian Cronin (brianc@unknownworlds.com)
+--
+-- Manages the alien buy/evolve menu.
+--
+-- ========= For more information, visit us at http://www.unknownworlds.com =====================
 
 Script.Load("lua/GUIParticleSystem.lua")
 Script.Load("lua/tweener/Tweener.lua")
@@ -74,14 +74,14 @@ local function UpdateItemsGUIScale(self)
     local scaledVector = GetScaledVector()
     
     GUIAlienBuyMenu.kAlienTypes = { { LocaleName = Locale.ResolveString("FADE"), Name = "Fade", Width = GUIScale(188), Height = GUIScale(220), XPos = 4, Index = 1 },
-                                { LocaleName = Locale.ResolveString("GORGE"), Name = "Gorge", Width = GUIScale(200), Height = GUIScale(167), XPos = 2, Index = 2 },
+                                { LocaleName = Locale.ResolveString("GORGE"), Name = "Gorge", Width = GUIScale(200), Height = GUIScale(167), XPos = 1, Index = 2 },
                                 { LocaleName = Locale.ResolveString("LERK"), Name = "Lerk", Width = GUIScale(284), Height = GUIScale(253), XPos = 3, Index = 3 },
                                 { LocaleName = Locale.ResolveString("ONOS"), Name = "Onos", Width = GUIScale(304), Height = GUIScale(326), XPos = 5, Index = 4 },
-                                { LocaleName = Locale.ResolveString("SKULK"), Name = "Skulk", Width = GUIScale(240), Height = GUIScale(170), XPos = 1, Index = 5 } }
+                                { LocaleName = Locale.ResolveString("SKULK"), Name = "Skulk", Width = GUIScale(240), Height = GUIScale(170), XPos = 2, Index = 5 } }
     GUIAlienBuyMenu.kBackgroundWidth = GUIScale((GUIAlienBuyMenu.kBackgroundTextureCoordinates[3] - GUIAlienBuyMenu.kBackgroundTextureCoordinates[1]) * 0.80)
     GUIAlienBuyMenu.kBackgroundHeight = GUIScale((GUIAlienBuyMenu.kBackgroundTextureCoordinates[4] - GUIAlienBuyMenu.kBackgroundTextureCoordinates[2]) * 0.80)
     
-    // We want the background graphic to look centered around the circle even though there is the part coming off to the right.
+    -- We want the background graphic to look centered around the circle even though there is the part coming off to the right.
     GUIAlienBuyMenu.kBackgroundXOffset = GUIScale(75)
     
     GUIAlienBuyMenu.kAlienButtonSize = GUIScale(150)
@@ -126,7 +126,7 @@ local function UpdateItemsGUIScale(self)
     
     GUIAlienBuyMenu.kUpgradeButtonSize = GUIScale(54)
     GUIAlienBuyMenu.kUpgradeButtonDistance = GUIScale(198)
-    // The distance in pixels to move the button inside the embryo when selected.
+    -- The distance in pixels to move the button inside the embryo when selected.
     GUIAlienBuyMenu.kUpgradeButtonDistanceInside = GUIScale(74)
     
     GUIAlienBuyMenu.kCloseButtonSize = GUIScale(48)
@@ -162,7 +162,7 @@ function GUIAlienBuyMenu:Initialize()
     self:_InitializeBackgroundCircle()    
     self:_InitializeSlots()
     self:_InitializeUpgradeButtons()
-    // _InitializeMouseOverInfo() must be called before _InitializeAlienButtons().
+    -- _InitializeMouseOverInfo() must be called before _InitializeAlienButtons().
     self:_InitializeMouseOverInfo()
     self:_InitializeAlienButtons()
     self:_InitializeCurrentAlienDisplay()
@@ -180,7 +180,7 @@ function GUIAlienBuyMenu:Uninitialize()
     self:_UninitializeBackground()
     self:_UninitializeSmokeParticles()
     self:_UninitializeBackgroundCircle()    
-    //self:_UninitializeResourceDisplay()
+    --self:_UninitializeResourceDisplay()
     self:_UninitializeUpgradeButtons()
     self:_UninitializeMouseOverInfo()
     self:_UninitializeAlienButtons()
@@ -243,7 +243,7 @@ end
 
 function GUIAlienBuyMenu:_InitializeBackground()
 
-    // This invisible background is used for centering only.
+    -- This invisible background is used for centering only.
     self.background = GUIManager:CreateGraphicItem()
     self.background:SetSize(Vector(GUIAlienBuyMenu.kBackgroundWidth, GUIAlienBuyMenu.kBackgroundHeight, 0))
     self.background:SetAnchor(GUIItem.Middle, GUIItem.Center)
@@ -275,7 +275,7 @@ function GUIAlienBuyMenu:_InitializeBackgroundCircle()
     
     self.backgroundCircleStencil = GUIManager:CreateGraphicItem()
     self.backgroundCircleStencil:SetIsStencil(true)
-    // This never moves and we want it to draw the stencil for the upgrade buttons.
+    -- This never moves and we want it to draw the stencil for the upgrade buttons.
     self.backgroundCircleStencil:SetClearsStencilBuffer(false)
     self.backgroundCircleStencil:SetSize(Vector(GUIAlienBuyMenu.kBackgroundWidth, GUIAlienBuyMenu.kBackgroundHeight, 0))
     self.backgroundCircleStencil:SetAnchor(GUIItem.Middle, GUIItem.Center)
@@ -345,7 +345,7 @@ function GUIAlienBuyMenu:_InitializeAlienButtons()
 
     for k, alienType in ipairs(GUIAlienBuyMenu.kAlienTypes) do
     
-        // The alien image.
+        -- The alien image.
         local alienGraphicItem = GUIManager:CreateGraphicItem()
         local ARAdjustedHeight = (alienType.Height / alienType.Width) * GUIAlienBuyMenu.kAlienButtonSize
         alienGraphicItem:SetSize(Vector(GUIAlienBuyMenu.kAlienButtonSize, ARAdjustedHeight, 0))
@@ -354,7 +354,7 @@ function GUIAlienBuyMenu:_InitializeAlienButtons()
         alienGraphicItem:SetTexture("ui/" .. alienType.Name .. ".dds")
         alienGraphicItem:SetIsVisible(AlienBuy_IsAlienResearched(alienType.Index))
         
-        // Create the text that indicates how many players are playing as a specific alien type.
+        -- Create the text that indicates how many players are playing as a specific alien type.
         local playersText = GUIManager:CreateTextItem()
         playersText:SetAnchor(GUIItem.Right, GUIItem.Bottom)
         playersText:SetFontName(kFont)
@@ -367,7 +367,7 @@ function GUIAlienBuyMenu:_InitializeAlienButtons()
         playersText:SetPosition(Vector(0, -GUIAlienBuyMenu.kPlayersTextSize, 0))
         alienGraphicItem:AddChild(playersText)
         
-        // Create the text that indicates the research progress.
+        -- Create the text that indicates the research progress.
         local researchText = GUIManager:CreateTextItem()
         researchText:SetAnchor(GUIItem.Middle, GUIItem.Center)
         researchText:SetFontName(kFont)
@@ -378,12 +378,12 @@ function GUIAlienBuyMenu:_InitializeAlienButtons()
         researchText:SetColor(ColorIntToColor(kAlienTeamColor))
         alienGraphicItem:AddChild(researchText)
         
-        // Create the selected background item for this alien item.
+        -- Create the selected background item for this alien item.
         local selectedBackground = GUIManager:CreateGraphicItem()
         selectedBackground:SetAnchor(GUIItem.Middle, GUIItem.Top)
         selectedBackground:SetSize(Vector(GUIAlienBuyMenu.kAlienSelectedButtonSize, GUIAlienBuyMenu.kAlienSelectedButtonSize, 0))
         selectedBackground:SetTexture(GUIAlienBuyMenu.kAlienSelectedBackground)
-        // Hide the selected background for now.
+        -- Hide the selected background for now.
         selectedBackground:SetColor(Color(1, 1, 1, 0))
         selectedBackground:AddChild(alienGraphicItem)
         
@@ -489,13 +489,13 @@ function GUIAlienBuyMenu:_InitializeMouseOverInfo()
     self.mouseOverInfo:SetTextAlignmentX(GUIItem.Align_Min)
     self.mouseOverInfo:SetTextAlignmentY(GUIItem.Align_Min)
     self.mouseOverInfo:SetColor(ColorIntToColor(kAlienTeamColor))
-    // Only visible on mouse over.
+    -- Only visible on mouse over.
     self.mouseOverInfo:SetIsVisible(false)
     self.background:AddChild(self.mouseOverInfo)
     
     self.mouseOverInfoResIcon = GUIManager:CreateGraphicItem()
     self.mouseOverInfoResIcon:SetSize(Vector(GUIAlienBuyMenu.kResourceIconWidth, GUIAlienBuyMenu.kResourceIconHeight, 0))
-    // Anchor to parent's left so we can hard-code "float" distance
+    -- Anchor to parent's left so we can hard-code "float" distance
     self.mouseOverInfoResIcon:SetAnchor(GUIItem.Right, GUIItem.Top)
     self.mouseOverInfoResIcon:SetPosition(GUIAlienBuyMenu.kMouseOverInfoResIconOffset)
     self.mouseOverInfoResIcon:SetTexture(GUIAlienBuyMenu.kResourceIconTexture)
@@ -516,7 +516,7 @@ function GUIAlienBuyMenu:_InitializeMouseOverInfo()
     self.mouseOverInfoResAmount:SetColor(ColorIntToColor(kAlienTeamColor))
     self.mouseOverInfoResIcon:AddChild(self.mouseOverInfoResAmount)
     
-    // Create health and armor icons and text
+    -- Create health and armor icons and text
     self.mouseOverInfoHealthIcon = GUIManager:CreateGraphicItem()
     self.mouseOverInfoHealthIcon:SetSize(Vector(GUIAlienBuyMenu.kResourceIconWidth, GUIAlienBuyMenu.kResourceIconHeight, 0))
     self.mouseOverInfoHealthIcon:SetAnchor(GUIItem.Right, GUIItem.Top)
@@ -607,7 +607,7 @@ end
 
 function GUIAlienBuyMenu:_InitializeUpgradeButtons()
 
-    // There are purchased and unpurchased buttons. Both are managed in this list.
+    -- There are purchased and unpurchased buttons. Both are managed in this list.
     self.upgradeButtons = { }
     
     local upgrades = AlienUI_GetPersonalUpgrades()
@@ -624,7 +624,7 @@ function GUIAlienBuyMenu:_InitializeUpgradeButtons()
             local angle = offsetAngle + anglePerUpgrade * (upgradeIndex-1) - anglePerUpgrade
             local techId = upgrades[upgradeIndex]
             
-            // Every upgrade has an icon.
+            -- Every upgrade has an icon.
             local buttonIcon = GUIManager:CreateGraphicItem()
             buttonIcon:SetAnchor(GUIItem.Middle, GUIItem.Center)
             buttonIcon:SetSize(Vector(GUIAlienBuyMenu.kUpgradeButtonSize, GUIAlienBuyMenu.kUpgradeButtonSize, 0))
@@ -636,7 +636,7 @@ function GUIAlienBuyMenu:_InitializeUpgradeButtons()
             iconY = iconY * GUIAlienBuyMenu.kUpgradeButtonTextureSize        
             buttonIcon:SetTexturePixelCoordinates(iconX, iconY, iconX + GUIAlienBuyMenu.kUpgradeButtonTextureSize, iconY + GUIAlienBuyMenu.kUpgradeButtonTextureSize)
             
-            // Render above the Alien image.
+            -- Render above the Alien image.
             buttonIcon:SetLayer(kGUILayerPlayerHUDForeground3)
             self.background:AddChild(buttonIcon)
 
@@ -782,7 +782,7 @@ function GUIAlienBuyMenu:_InitializeGlowieParticles()
     local followVelocityFunc = function(particle, lifeTime)
                                    particle.Item:SetRotation(Vector(0, 0, math.atan2(particle.velocity.x, particle.velocity.y) - math.pi / 2))
                                end
-    // The glowie will fade in until the lifetime is at this amount and then fade out for the rest of the time.
+    -- The glowie will fade in until the lifetime is at this amount and then fade out for the rest of the time.
     local fadeInToLifetime = 0.3
     local fadeInFunc = function(particle, lifetime) if lifetime <= fadeInToLifetime then particle.Item:SetColor(Color(1, 1, 1, lifetime / fadeInToLifetime)) end end
     local fadeOutFunc = function(particle, lifetime) if lifetime > fadeInToLifetime then particle.Item:SetColor(Color(1, 1, 1, 1 - (lifetime - fadeInToLifetime) / (1 - fadeInToLifetime))) end end
@@ -820,10 +820,10 @@ function GUIAlienBuyMenu:_InitializeGlowieParticles()
     self.glowieParticles:SetAnchor(GUIItem.Middle, GUIItem.Center)
     self.glowieParticles:SetLayer(kGUILayerPlayerHUDForeground1)
     
-    // Fast forward so particles already exist when the player first sees the menu.
+    -- Fast forward so particles already exist when the player first sees the menu.
     self.glowieParticles:FastForward(10)
     
-    // We don't want the mouse affecting the particles until the player can see the particles, so add it after the FF.
+    -- We don't want the mouse affecting the particles until the player can see the particles, so add it after the FF.
     local mouseAttractMod = function(particle, deltaTime)
                                 local itemScreenPosition = particle.Item:GetScreenPosition(Client.GetScreenWidth(), Client.GetScreenHeight())
                                 itemScreenPosition.x = itemScreenPosition.x + particle.Item:GetSize().x / 2
@@ -922,7 +922,7 @@ function GUIAlienBuyMenu:_InitializeSmokeParticles()
     self.smokeParticles:SetAnchor(GUIItem.Right, GUIItem.Center)
     --self.smokeParticles:SetLayer(kGUILayerPlayerHUDBackground)
     
-    // Fast forward so particles already exist when the player first sees the menu.
+    -- Fast forward so particles already exist when the player first sees the menu.
     self.smokeParticles:FastForward(3)
 
 end
@@ -1075,7 +1075,7 @@ local function GetCanAffordAlienTypeAndUpgrades(self, alienType)
 
     local alienCost = AlienBuy_GetAlienCost(alienType, false)
     local upgradesCost = GetSelectedUpgradesCost(self, alienType)
-    // Cannot buy the current alien without upgrades.
+    -- Cannot buy the current alien without upgrades.
     if alienType == AlienBuy_GetCurrentAlien() then
         alienCost = 0
     end
@@ -1084,9 +1084,7 @@ local function GetCanAffordAlienTypeAndUpgrades(self, alienType)
     
 end
 
-/**
- * Returns true if the player has a different Alien or any upgrade selected.
- */
+-- Returns true if the player has a different Alien or any upgrade selected.
 local function GetAlienOrUpgradeSelected(self)
     return self.selectedAlienType ~= AlienBuy_GetCurrentAlien() or GetNumberOfNewlySelectedUpgrades(self) > 0
 end
@@ -1105,22 +1103,22 @@ local function UpdateEvolveButton(self)
     
         evolveText = Locale.ResolveString("ABM_SELECT_UPGRADES")
         
-        // If the current alien is selected with no upgrades, cannot evolve.
+        -- If the current alien is selected with no upgrades, cannot evolve.
         if self.selectedAlienType == AlienBuy_GetCurrentAlien() and numberOfSelectedUpgrades == 0 then
             evolveButtonTextureCoords = GUIAlienBuyMenu.kEvolveButtonNeedResourcesTextureCoordinates
         elseif not GetCanAffordAlienTypeAndUpgrades(self, self.selectedAlienType) then
         
-            // If cannot afford selected alien type and/or upgrades, cannot evolve.
+            -- If cannot afford selected alien type and/or upgrades, cannot evolve.
             evolveButtonTextureCoords = GUIAlienBuyMenu.kEvolveButtonNeedResourcesTextureCoordinates
             evolveText = Locale.ResolveString("ABM_NEED")
             evolveCost = AlienBuy_GetAlienCost(self.selectedAlienType, false) + selectedUpgradesCost
             
         else
         
-            // Evolution is possible! Darwin would be proud.
+            -- Evolution is possible! Darwin would be proud.
             local totalCost = selectedUpgradesCost
             
-            // Cannot buy the current alien.
+            -- Cannot buy the current alien.
             if self.selectedAlienType ~= AlienBuy_GetCurrentAlien() then
                 totalCost = totalCost + AlienBuy_GetAlienCost(self.selectedAlienType, false)
             end
@@ -1173,7 +1171,7 @@ function GUIAlienBuyMenu:Update(deltaTime)
 
     PROFILE("GUIAlienBuyMenu:Update")
     
-    // Assume there is no mouse over info to start.
+    -- Assume there is no mouse over info to start.
     self:_HideMouseOverInfo()
     
     self.currentAlienDisplay.Icon:SetTexture("ui/" .. GUIAlienBuyMenu.kAlienTypes[self.selectedAlienType].Name .. ".dds")
@@ -1232,7 +1230,7 @@ end
 function GUIAlienBuyMenu:_GetCanAffordAlienType(alienType)
 
     local alienCost = AlienBuy_GetAlienCost(alienType, false)
-    // Cannot buy the current alien without upgrades.
+    -- Cannot buy the current alien without upgrades.
     if alienType == AlienBuy_GetCurrentAlien() then
         return false
     end
@@ -1268,13 +1266,13 @@ function GUIAlienBuyMenu:_UpdateAlienButtons()
     
     for k, alienButton in ipairs(self.alienButtons) do
     
-        // Info needed for the rest of this code.
+        -- Info needed for the rest of this code.
         local researched, researchProgress, researching = self:_GetAlienTypeResearchInfo(alienButton.TypeData.Index)
         
         local buttonIsVisible = researched or researching
         alienButton.Button:SetIsVisible(buttonIsVisible)
         
-        // Don't bother updating anything else unless it is visible.
+        -- Don't bother updating anything else unless it is visible.
         if buttonIsVisible then
         
             local isCurrentAlien = AlienBuy_GetCurrentAlien() == alienButton.TypeData.Index
@@ -1298,7 +1296,7 @@ function GUIAlienBuyMenu:_UpdateAlienButtons()
                 
             end
             
-            // Only show the background if the mouse is over this button.
+            -- Only show the background if the mouse is over this button.
             alienButton.SelectedBackground:SetColor(Color(1, 1, 1, ((mouseOver and 1) or 0)))
 
             local offset = Vector((((alienButton.TypeData.XPos - 1) / numAlienTypes) * (GUIAlienBuyMenu.kAlienButtonSize * numAlienTypes)) - (totalAlienButtonsWidth / 2), 0, 0)
@@ -1336,7 +1334,7 @@ function GUIAlienBuyMenu:_UpdateUpgrades(deltaTime)
         elseif not AlienBuy_GetTechAvailable(currentButton.TechId) then           
             useColor = kNotAvailableColor
 
-            // unselect button if tech becomes unavailable
+            -- unselect button if tech becomes unavailable
             if currentButton.Selected then
                 currentButton.Selected = false
             end
@@ -1359,8 +1357,8 @@ function GUIAlienBuyMenu:_UpdateUpgrades(deltaTime)
             local currentUpgradeInfoText = GetDisplayNameForTechId(currentButton.TechId)
             local tooltipText = GetTooltipInfoText(currentButton.TechId)
 
-            //local health = LookupTechData(currentButton.TechId, kTechDataMaxHealth)
-            //local armor = LookupTechData(currentButton.TechId, kTechDataMaxArmor)
+            --local health = LookupTechData(currentButton.TechId, kTechDataMaxHealth)
+            --local armor = LookupTechData(currentButton.TechId, kTechDataMaxArmor)
 
             self:_ShowMouseOverInfo(currentUpgradeInfoText, tooltipText, GetUpgradeCostForLifeForm(Client.GetLocalPlayer(), self.selectedAlienType, currentButton.TechId))
 
@@ -1519,18 +1517,18 @@ function GUIAlienBuyMenu:SendKeyEvent(key, down)
         local mouseX, mouseY = Client.GetCursorPosScreen()
         if down then
         
-            // Check if the evolve button was selected.
+            -- Check if the evolve button was selected.
             local allowedToEvolve = GetCanAffordAlienTypeAndUpgrades(self, self.selectedAlienType) and PlayerUI_GetHasGameStarted()
             allowedToEvolve = allowedToEvolve and GetAlienOrUpgradeSelected(self)
             if allowedToEvolve and self:_GetIsMouseOver(self.evolveButtonBackground) then
             
                 local purchases = { }
-                // Buy the selected alien if we have a different one selected.
+                -- Buy the selected alien if we have a different one selected.
                 if self.selectedAlienType ~= AlienBuy_GetCurrentAlien() then
                     table.insert(purchases, { Type = "Alien", Alien = self.selectedAlienType })
                 end
                 
-                // Buy all selected upgrades.
+                -- Buy all selected upgrades.
                 for i, currentButton in ipairs(self.upgradeButtons) do
                 
                     if currentButton.Selected then
@@ -1554,13 +1552,13 @@ function GUIAlienBuyMenu:SendKeyEvent(key, down)
             
             if not inputHandled then
             
-                // Check if an alien was selected.
+                -- Check if an alien was selected.
                 for k, buttonItem in ipairs(self.alienButtons) do
                 
                     local researched, researchProgress, researching = self:_GetAlienTypeResearchInfo(buttonItem.TypeData.Index)
                     if (researched or researching) and self:_GetIsMouseOver(buttonItem.Button) then
                     
-                        // Deselect all upgrades when a different alien type is selected.
+                        -- Deselect all upgrades when a different alien type is selected.
                         if self.selectedAlienType ~= buttonItem.TypeData.Index then
                         
                             AlienBuy_OnSelectAlien(GUIAlienBuyMenu.kAlienTypes[buttonItem.TypeData.Index].Name)
@@ -1578,7 +1576,7 @@ function GUIAlienBuyMenu:SendKeyEvent(key, down)
                     
                 end
                 
-                // Check if the close button was pressed.
+                -- Check if the close button was pressed.
                 if self:_GetIsMouseOver(self.closeButton) then
                 
                     closeMenu = true
@@ -1593,12 +1591,12 @@ function GUIAlienBuyMenu:SendKeyEvent(key, down)
         
     end
     
-    // No matter what, this menu consumes MouseButton0/1 down.
+    -- No matter what, this menu consumes MouseButton0/1 down.
     if down and (key == InputKey.MouseButton0 or key == InputKey.MouseButton1) then
         inputHandled = true
     end
     
-    // AlienBuy_Close() must be the last thing called.
+    -- AlienBuy_Close() must be the last thing called.
     if closeMenu then
     
         self.closingMenu = true
@@ -1638,7 +1636,7 @@ function GUIAlienBuyMenu:_HandleUpgradeClicked(mouseX, mouseY)
     local inputHandled = false
     
     for i, currentButton in ipairs(self.upgradeButtons) do
-        // Can't select if it has been purchased already.
+        -- Can't select if it has been purchased already.
         
         local allowedToUnselect = currentButton.Selected
         local allowedToPuchase = not currentButton.Selected and self:GetCanSelect(currentButton)
@@ -1692,9 +1690,9 @@ end
 
 function GUIAlienBuyMenu:OnClose()
 
-    // Check if GUIAlienBuyMenu is what is causing itself to close.
+    -- Check if GUIAlienBuyMenu is what is causing itself to close.
     if not self.closingMenu then
-        // Play the close sound since we didn't trigger the close.
+        -- Play the close sound since we didn't trigger the close.
         AlienBuy_OnClose()
     end
 

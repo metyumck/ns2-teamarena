@@ -153,6 +153,7 @@ local networkVars =
     
     timeLastBeacon = "private time",
     
+    weaponBeforeUseId = "private entityid"
 }
 
 AddMixinNetworkVars(OrdersMixin, networkVars)
@@ -245,6 +246,7 @@ function Marine:OnCreate()
     self.catpackboost = false
     self.timeCatpackboost = 0
     self.flashlightLastFrame = false
+    self.weaponBeforeUseId = Entity.invalidId
     
 end
 
@@ -528,7 +530,7 @@ function Marine:HandleButtons(input)
          
        
         
-        if bit.band(input.commands, Move.Drop) ~= 0 and not self:GetIsVortexed() then
+        if bit.band(input.commands, Move.Drop) ~= 0 and not self:GetIsVortexed() and not self:GetIsUsing() then
         
             if Server then
             
@@ -574,7 +576,25 @@ function Marine:HandleButtons(input)
 end
 
 
+function Marine:GetFlashlightToggled()
+    local edgeOn, edgeOff = self.timeOfLastFlashlightOn, self.timeOfLastFlashlightOff
+    if edgeOn and edgeOff then
+        local diff = math.abs( edgeOn - edgeOff )
+        if diff < 0.75 then
+            return true, math.max( edgeOn, edgeOff )
+        end
+    end
+
+    return false        
+end
+
 function Marine:SetFlashlightOn(state)
+    local time = Shared.GetTime()
+    if state then
+        self.timeOfLastFlashlightOn = time
+    else
+        self.timeOfLastFlashlightOff = time
+    end
     self.flashlightOn = state
 end
 
@@ -606,7 +626,12 @@ function Marine:GetMaxSpeed(possible)
     
     // Take into account our weapon inventory and current weapon. Assumes a vanilla marine has a scalar of around .8.
     local inventorySpeedScalar = self:GetInventorySpeedScalar() + .17    
-    local useModifier = self.isUsing and 0.5 or 1
+    local useModifier = 1
+
+    local activeWeapon = self:GetActiveWeapon()
+    if self.isUsing and activeWeapon:GetMapName() == Builder.kMapName then
+        useModifier = 0.5
+    end
     
     if self.catpackboost then
         maxSpeed = maxSpeed + kCatPackMoveAddSpeed
@@ -822,28 +847,51 @@ function Marine:OnUseTarget(target)
 
     local activeWeapon = self:GetActiveWeapon()
 
-    if target and HasMixin(target, "Construct") and ( target:GetCanConstruct(self) or (target.CanBeWeldedByBuilder and target:CanBeWeldedByBuilder()) ) then
-    
-        if activeWeapon and activeWeapon:GetMapName() ~= Builder.kMapName then
-            self:SetActiveWeapon(Builder.kMapName, true)
-            self.weaponBeforeUse = activeWeapon:GetMapName()
+    if target and HasMixin(target, "Construct") 
+        and ( target:GetCanConstruct(self) or (target.CanBeWeldedByBuilder and target:CanBeWeldedByBuilder()) )
+        and not 
+            (  target:isa("PowerPoint") and -- is a powerpoint
+            not target:GetIsBuilt() and target.buildFraction == 1 -- which is primed
+            and not target:CanBeCompletedByScriptActor( self ) ) -- but can't be finished
+    then
+        
+        local buildTool = Builder.kMapName
+        if self:GetWeapon(Welder.kMapName) ~= nil then
+            buildTool = Welder.kMapName
+        end
+        
+        if self.weaponBeforeUseId == Entity.invalidId  then
+            self.weaponBeforeUseId = activeWeapon:GetId()
+            self:SetActiveWeapon(buildTool, true)
+        end
+        
+        activeWeapon = self:GetActiveWeapon()
+        if activeWeapon:GetMapName() == Welder.kMapName then
+            self:PrimaryAttack()
         end
         
     else
-        if activeWeapon and activeWeapon:GetMapName() == Builder.kMapName and self.weaponBeforeUse then
-            self:SetActiveWeapon(self.weaponBeforeUse, true)
-        end    
+        
+        self:OnUseEnd()
+        
     end
 
 end
 
 function Marine:OnUseEnd() 
+    local activeWeapon = self:GetActiveWeapon()        
 
-    local activeWeapon = self:GetActiveWeapon()
-
-    if activeWeapon and activeWeapon:GetMapName() == Builder.kMapName and self.weaponBeforeUse then
-        self:SetActiveWeapon(self.weaponBeforeUse)
+    if activeWeapon and ( activeWeapon:GetMapName() == Builder.kMapName or activeWeapon:GetMapName() == Welder.kMapName ) and self.weaponBeforeUseId ~= Entity.invalidId then
+        if activeWeapon:GetMapName() == Welder.kMapName then
+            self:PrimaryAttackEnd()
+        end
+        local weaponBeforeUse = self.weaponBeforeUseId and (Shared.GetEntity(self.weaponBeforeUseId))
+        if weaponBeforeUse then
+            self:SetActiveWeapon(weaponBeforeUse:GetMapName(),true)
+        end
     end
+    
+    self.weaponBeforeUseId = Entity.invalidId
 
 end
 

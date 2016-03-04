@@ -9,6 +9,7 @@
 
 Script.Load("lua/Gamerules.lua")
 Script.Load("lua/dkjson.lua")
+Script.Load("lua/bots/BotTeamController.lua")
 Script.Load("lua/ServerSponitor.lua")
 Script.Load("lua/PlayerRanking.lua")
 
@@ -25,6 +26,7 @@ NS2Gamerules.kMapName = "ns2_gamerules"
 kGameEndAutoConcedeCheckInterval = 0.75
 kDrawGameWindow = 0.75
 
+local kRookieModeDelay = 20
 local kPregameLength = 3
 local kTimeToReadyRoom = 8
 local kPauseToSocializeBeforeMapcycle = 30
@@ -204,6 +206,8 @@ if Server then
         
         self.techPointRandomizer = Randomizer()
         self.techPointRandomizer:randomseed(Shared.GetSystemTime())
+
+        self.botTeamController = BotTeamController()
         
         -- Create team objects
         self.team1 = self:BuildTeam(kTeam1Type)
@@ -229,6 +233,12 @@ if Server then
         self.autobuild = false
         self.teamsReady = false
         self.tournamentMode = false
+
+	--Set rookie mode based on the config values
+        self:SetRookieMode(Server.GetConfigSetting("rookie_only"))
+        if self.gameInfo:GetRookieMode() then
+            self:SetMaxBots(Server.GetConfigSetting("rookie_only_bots"), true)
+        end
         
         self.listOfPastVIPs = {}
         
@@ -265,6 +275,32 @@ if Server then
     function NS2Gamerules:CanEntityDoDamageTo(attacker, target)
         return CanEntityDoDamageTo(attacker, target, Shared.GetCheatsEnabled(), Shared.GetDevMode(), self:GetFriendlyFire())
     end
+    
+    function NS2Gamerules:OnCommanderLogout(commandStructure, oldCommander)
+        if self.gameInfo:GetRookieMode() and self:GetGameState() > kGameState.NotStarted and
+                self:GetGameState() < kGameState.Team1Won and
+                not self.botTeamController:GetCommanderBot(commandStructure:GetTeamNumber()) then
+            OnConsoleAddBots(nil, 1, commandStructure:GetTeamNumber(), "com")
+        end
+    end
+
+    function NS2Gamerules:OnCommanderLogin(commandStructure, newCommander)
+        if self.gameInfo:GetRookieMode() then
+            local teamInfo = GetTeamInfoEntity(commandStructure:GetTeamNumber())
+            if teamInfo:GetLastCommIsBot() then
+                for i = 1,2 do
+                    local bot = gServerBots[i]
+                    if bot and bot:GetPlayer():GetTeamNumber() == commandStructure:GetTeamNumber() then
+                        bot:Disconnect()
+                    end
+                end
+            end
+        elseif not Shared.GetCheatsEnabled() and not self.botTraining and newCommander:GetIsRookie() then
+            Server.SendNetworkMessage(nil, "CommanderLoginError", {}, true)
+        end
+
+        return not commandStructure:GetTeam():GetHasCommander()
+    end
 
     function NS2Gamerules:OnClientDisconnect(client)
 
@@ -285,6 +321,7 @@ if Server then
             if not self.clientpres[clientUserId] then self.clientpres[clientUserId] = {} end
             self.clientpres[clientUserId][teamNumber] = player:GetResources()
             
+	    self.botTeamController:UpdateBots()
         end
         
         Gamerules.OnClientDisconnect(self, client)
@@ -497,6 +534,8 @@ if Server then
      ]]
     function NS2Gamerules:ResetGame()
     
+        self:SetGameState(kGameState.NotStarted)
+        
         TournamentModeOnReset()
     
         -- save commanders for later re-login
@@ -509,8 +548,6 @@ if Server then
         
         -- Destroy any map entities that are still around
         DestroyLiveMapEntities()
-        
-        self:SetGameState(kGameState.NotStarted)
         
         -- Reset all players, delete other not map entities that were created during 
         -- the game (hives, command structures, initial resource towers, etc)
@@ -674,10 +711,10 @@ if Server then
         
         -- login the commanders again
         local function LoginCommander(commandStructure, client)
-			local player = client and client:GetControllingPlayer()
+	    local player = client and client:GetControllingPlayer()
             if commandStructure and player then
 				-- make up for not manually moving to CS and using it
-				commandStructure.occupied = true
+				commandStructure.occupied = not client:GetIsVirtual()
 				player:SetOrigin(commandStructure:GetDefaultEntryOrigin())
 				commandStructure:LoginPlayer(player,true)
             end
@@ -963,6 +1000,7 @@ if Server then
         local wasDisabled = false
         
         -- Check if auto-team balance should be enabled or disabled.
+        -- Disable automatically if cheats are on so you can play against more bots
         local autoTeamBalance = not Shared.GetCheatsEnabled() and Server.GetConfigSetting("auto_team_balance")
         if autoTeamBalance and autoTeamBalance.enabled then
         
@@ -1092,8 +1130,21 @@ if Server then
 
     end
 
+    function NS2Gamerules:GetReservedSlots()
+        local tags = { }
+        Server.GetTags(tags)
+
+        for t = 1, #tags do
+            if string.find(tags[t], "R_S") then
+                return tonumber(string.sub(tags[t], 4))
+            end
+        end
+
+        return 0
+    end
+
     function NS2Gamerules:SetRookieMode(state)
-        self.rookieMode = state
+        self.gameInfo:SetRookieMode(state)
 
         if state then
             Server.AddTag("rookie_only")
@@ -1407,9 +1458,7 @@ if Server then
     function NS2Gamerules:GetCanJoinTeamNumber(player, teamNumber)
 
         local forceEvenTeams = Server.GetConfigSetting("force_even_teams_on_join")
-        -- This option was added after shipping, so support older config files that don't include it.
-        -- Fallback to forcing even teams if they don't have this entry in the config file.
-        if not (forceEvenTeams == false) then
+        if forceEvenTeams then
         
             local team1Players = self.team1:GetNumPlayers()
             local team2Players = self.team2:GetNumPlayers()
@@ -1420,9 +1469,14 @@ if Server then
                 return false, 0
             end
             
-        elseif not self:GetRookieMode() and not playedTutorial[player:GetSteamId()] and
-                player:GetPlayerSkill() ~= -1 and player:GetPlayerSkill() < 1 then
-            return false, 1
+        end
+
+        if not Shared.GetCheatsEnabled() and not self.botTraining and player:GetPlayerLevel() ~= -1 then
+            if not self.gameInfo:GetRookieMode() and not playedTutorial[player:GetSteamId()] and player:GetPlayerLevel() < 1 then
+                return false, 1
+            elseif self.gameInfo:GetRookieMode() and player:GetPlayerLevel() >= kRookieLevel then
+                return false, 2
+            end
         end
         
         return true
@@ -1437,6 +1491,15 @@ if Server then
     function NS2Gamerules:GetCanSpawnImmediately()
         return not self:GetGameStarted() or Shared.GetCheatsEnabled() or (Shared.GetTime() < (self.gameStartTime + kFreeSpawnTime))
     end
+
+    function NS2Gamerules:SetMaxBots(newMax, com)
+        self.botTeamController:SetMaxBots(newMax, com)
+        self.botTeamController:UpdateBots()
+    end
+
+    function NS2Gamerules:SetBotTraining(training)
+        self.botTraining = training
+    end
     
     --[[
      * Returns two return codes: success and the player on the new team. This player could be a new
@@ -1450,15 +1513,13 @@ if Server then
         if not client then return end
         
         local success = false
+	local newPlayer
+
         local oldPlayerWasSpectating = client and client:GetSpectatingPlayer()
         local oldTeamNumber = player:GetTeamNumber()
         
         -- Join new team
-        if oldTeamNumber ~= newTeamNumber or force then        
-            
-            if player:isa("Commander") then
-                OnCommanderLogOut(player)
-            end        
+        if oldTeamNumber ~= newTeamNumber or force then             
             
             if not Shared.GetCheatsEnabled() and self:GetGameStarted() and newTeamNumber ~= kTeamReadyRoom then
                 player.spawnBlockTime = Shared.GetTime() + kSuicideDelay
@@ -1548,6 +1609,7 @@ if Server then
                     newPlayer:SetSpectatorMode(kSpectatorMode.Overhead)
                 end
                 
+                self.botTeamController:UpdateBots()
             end
 
             return success, newPlayer
@@ -1776,9 +1838,9 @@ if Server then
    
 
     function NS2Gamerules:GetWinConditionMet(marineWins, alienWins)
-        if (marineWins > 3) and ((marineWins - alienWins) >= 2) or self.team2:GetNumPlayers() < 1 then
+        if (marineWins > 5) and ((marineWins - alienWins) >= 2) or self.team2:GetNumPlayers() < 1 then
             return 1
-        elseif (alienWins > 3) and ((alienWins - marineWins) >= 2) or self.team1:GetNumPlayers() < 1 then
+        elseif (alienWins > 5) and ((alienWins - marineWins) >= 2) or self.team1:GetNumPlayers() < 1 then
             return 2
         else 
             return 0
@@ -1870,6 +1932,10 @@ if Server then
         local preGameTime = kPregameLength
         if Shared.GetCheatsEnabled() then
             preGameTime = 0
+        end
+
+        if self.gameInfo:GetRookieMode() and #gServerBots >= 2 then
+            preGameTime = kRookieModeDelay
         end
         
         return preGameTime

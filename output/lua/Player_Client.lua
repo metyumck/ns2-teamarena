@@ -571,8 +571,6 @@ function PlayerUI_GetStatusInfoForUnit(player, unit)
     return nil
 end
             
-            
-
 -- collects unit status info for a single unit
 function PlayerUI_GetUnitStatusInfo()
 

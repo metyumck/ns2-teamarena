@@ -180,7 +180,16 @@ function OnCommandJoinError(message)
 
         MainMenu_Open()
         GetGUIMainMenu():CreateTutorialNagWindow()
+    elseif message.reason == 2 then
+        ChatUI_AddSystemMessage( Locale.ResolveString("JOIN_ERROR_VETERAN") )
+
+        MainMenu_Open()
+        GetGUIMainMenu():CreateRookieOnlyNagWindow()
     end
+end
+
+function OnCommanderLoginError(message)
+    ChatUI_AddSystemMessage( Locale.ResolveString("LOGIN_ERROR_ROOKIE") )
 end
 
 function OnVoteConcedeCast(message)
@@ -267,6 +276,12 @@ local function OnCommandCameraShake(message)
 
 end
 
+local function OnSetAchievement(message)
+    if message and message.name then
+        Client.SetAchievement(message.name)
+    end
+end
+
 Client.HookNetworkMessage("AutoConcedeWarning", OnMessageAutoConcedeWarning)
 
 Client.HookNetworkMessage("Ping", OnCommandPing)
@@ -275,6 +290,7 @@ Client.HookNetworkMessage("Damage", OnCommandDamage)
 Client.HookNetworkMessage("HitSound", OnCommandHitSound)
 Client.HookNetworkMessage("AbilityResult", OnCommandAbilityResult)
 Client.HookNetworkMessage("JoinError", OnCommandJoinError)
+Client.HookNetworkMessage("CommanderLoginError", OnCommanderLoginError)
 
 Client.HookNetworkMessage("ClearTechTree", OnCommandClearTechTree)
 Client.HookNetworkMessage("TechNodeBase", OnCommandTechNodeBase)
@@ -295,4 +311,6 @@ Client.HookNetworkMessage("VoteConcedeCast", OnVoteConcedeCast)
 Client.HookNetworkMessage("VoteEjectCast", OnVoteEjectCast)
 Client.HookNetworkMessage("TeamConceded", OnTeamConceded)
 Client.HookNetworkMessage("CameraShake", OnCommandCameraShake)
+
+Client.HookNetworkMessage("CommanderLoginError", OnCommanderLoginError)
 

@@ -31,6 +31,10 @@ function Player:SetPlayerInfo(playerInfo)
     
 end
 
+function Player:GetPlayerInfo()
+    return self.playerInfo
+end
+
 //create a function that deep copies the team tech tree so armor, weapon upgrades and hive abilities don't "leak"
 
 
@@ -175,7 +179,7 @@ function Player:OnKill(killer, doer, point, direction)
         end
         if realKiller and realKiller:isa("Player") then
             self.killedBy = killer:GetId()
-            killerName = killer:GetName()
+            killerName = realKiller:GetName()
             Log("%s: killed by %s", self, self.killedBy)
         end
     end
@@ -345,6 +349,7 @@ local function UpdateChangeToSpectator(self)
     end
     
 end
+
 function Player:OnUpdatePlayer(deltaTime)
 
     UpdateChangeToSpectator(self)
@@ -797,13 +802,17 @@ function Player:TriggerAlert(techId, entity)
     
 end
 
-function Player:SetRookieMode(rookieMode)
+function Player:SetRookie(isRookie)
 
-    if self.isRookie ~= rookieMode then
-        self.isRookie = rookieMode
+    if self.isRookie ~= isRookie then
+        self.isRookie = isRookie
         if self.playerInfo then self.playerInfo:UpdateScore() end
     end
-    
+
+end
+
+function Player:GetIsRookie()
+    return self.isRookie
 end
 
 function Player:OnClientUpdated(client)

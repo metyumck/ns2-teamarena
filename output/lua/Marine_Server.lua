@@ -337,8 +337,12 @@ function Marine:AttemptToBuy(techIds)
             else
             
                 // Make sure we're ready to deploy new weapon so we switch to it properly.
-                if self:GiveItem(mapName) then
-                
+                local newItem = self:GiveItem(mapName)
+                if newItem then
+                    if newItem.UpdateWeaponSkins then
+                        -- Apply weapon variant
+                        newItem:UpdateWeaponSkins( self:GetClient() )
+                    end
                     StartSoundEffectAtOrigin(Marine.kGunPickupSound, self:GetOrigin())                    
                     return true
                     

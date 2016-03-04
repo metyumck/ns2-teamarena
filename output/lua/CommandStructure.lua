@@ -10,6 +10,7 @@
 Script.Load("lua/Mixins/ModelMixin.lua")
 Script.Load("lua/LiveMixin.lua")
 Script.Load("lua/PointGiverMixin.lua")
+Script.Load("lua/AchievementGiverMixin.lua")
 Script.Load("lua/GameEffectsMixin.lua")
 Script.Load("lua/SelectableMixin.lua")
 Script.Load("lua/FlinchMixin.lua")
@@ -64,6 +65,7 @@ function CommandStructure:OnCreate()
     InitMixin(self, FlinchMixin)
     InitMixin(self, TeamMixin)
     InitMixin(self, PointGiverMixin)
+    InitMixin(self, AchievementGiverMixin)
     InitMixin(self, SelectableMixin)
     InitMixin(self, EntityChangeMixin)
     InitMixin(self, LOSMixin)
@@ -169,7 +171,7 @@ function CommandStructure:OnUpdateAnimationInput(modelMixin)
 end
 
 function CommandStructure:GetCanBeUsedConstructed(byPlayer)
-    return not self:GetIsOccupied() and not byPlayer:isa("Exo")
+    return not ( byPlayer:isa("Exo") or GetTeamHasCommander(self:GetTeamNumber()))
 end
 
 // allow players to enter the hives before game start to signal that they want to command
