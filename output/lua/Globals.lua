@@ -139,7 +139,7 @@ kMainMenuFlash = "ui/main_menu.swf"
 
 kPlayerStatus = enum( { "Hidden", "Dead", "Evolving", "Embryo", "Commander", "Exo", "GrenadeLauncher", "Rifle", "Shotgun", "Flamethrower", "Void", "Spectator", "Skulk", "Gorge", "Fade", "Lerk", "Onos", "SkulkEgg", "GorgeEgg", "FadeEgg", "LerkEgg", "OnosEgg", "VIP" } )
 kPlayerCommunicationStatus = enum( {'None', 'Voice', 'Typing', 'Menu'} )
-kSpectatorMode = enum( { 'FreeLook', 'Overhead', 'Following', 'FirstPerson' } )
+kSpectatorMode = enum( { 'FreeLook', 'Overhead', 'Following', 'FirstPerson', 'KillCam' } )
 
 kMaxAlienAbilities = 3
 
@@ -248,7 +248,7 @@ kFeedbackURL = "http://getsatisfaction.com/unknownworlds/feedback/topics/new?pro
 kMenuFlashIndex = 2
 
 // Fade to black time (then to spectator mode)
-kFadeToBlackTime = 3
+kFadeToBlackTime = 2
 
 // Constant to prevent z-fighting 
 kZFightingConstant = 0.1
@@ -259,6 +259,11 @@ kCommanderInvisibleVentsGroupName = "CommanderInvisibleVents"
 // Any geometry or props with this name will not support being built on top of
 kCommanderNoBuildGroupName = "CommanderNoBuild"
 kCommanderBuildGroupName = "CommanderBuild"
+
+kSeasonalFallName = "SeasonalFall"
+kSeasonalFallExcludeName = "SeasonalFallExclude"
+kSeasonalWinterName = "SeasonalWinter"
+kSeasonalWinterExcludeName = "SeasonalWinterExclude"
 
 // invisible and blocks all movement
 kMovementCollisionGroupName = "MovementCollisionGeometry"
@@ -375,7 +380,8 @@ kStructureLOSDistance = 3.5
 
 kGestateCameraDistance = 1.75
 
-// Rookie mode
+-- Rookie mode
+kRookieLevel = 3
 kRookieSaveInterval = 30 // seconds
 kRookieTimeThreshold = 4 * 60 * 60 // 4 hours
 kRookieNetworkCheckInterval = 2

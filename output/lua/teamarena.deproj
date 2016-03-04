@@ -49,6 +49,9 @@
     <filename>Marine.lua</filename>
   </file>
   <file>
+    <filename>MarineBuy_Client.lua</filename>
+  </file>
+  <file>
     <filename>MarineTeam.lua</filename>
   </file>
   <file>
@@ -86,6 +89,9 @@
   </file>
   <file>
     <filename>Scoreboard.lua</filename>
+  </file>
+  <file>
+    <filename>Shared.lua</filename>
   </file>
   <file>
     <filename>Team.lua</filename>

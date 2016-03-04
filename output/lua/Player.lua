@@ -212,6 +212,9 @@ Player.kMaxStepAmount = 2
  ]]
 local networkVars =
 {
+    // the player need to track its own origin at full precision in order for its 
+    
+    // own movement and actions to be fluid and predictable
     fullPrecisionOrigin = "private vector", 
     
     clientIndex = "entityid",
@@ -252,10 +255,6 @@ local networkVars =
     
     primaryAttackLastFrame = "boolean",
     secondaryAttackLastFrame = "boolean",
-    
-    -- Used to smooth out the eye movement when going up steps.
-    stepStartTime = "compensated time",
-    stepAmount = "compensated float(-2.1 to 2.1 by 0.001)", -- limits must be just slightly bigger than kMaxStepAmount
     
     isUsing = "boolean",
     
@@ -364,9 +363,6 @@ function Player:OnCreate()
     self.timeOfDeath = nil
     
     self.resources = 0
-    
-    self.stepStartTime = 0
-    self.stepAmount = 0
     
     self.isMoveBlocked = false
     self.isRookie = false
@@ -484,6 +480,7 @@ function Player:OnInitialized()
         
     end
     
+    // TODO: MOVE TO ONCREATE
     self.communicationStatus = kPlayerCommunicationStatus.None
     
 end
@@ -627,21 +624,6 @@ end
 
 function Player:GetViewOffset()
     return self.viewOffset
-end
-
---[[
-    Returns the view offset with the step smoothing factored in.
-]]
-function Player:GetSmoothedViewOffset()
-
-    local deltaTime = Shared.GetTime() - self.stepStartTime
-    
-    if deltaTime < Player.stepTotalTime then
-        return self.viewOffset + Vector( 0, -self.stepAmount * (1 - deltaTime / Player.stepTotalTime), 0 )
-    end
-    
-    return self.viewOffset
-    
 end
 
 --[[
@@ -1084,31 +1066,6 @@ function Player:GetClampedMaxSpeed()
     return 30
 end
 
-local function UpdateStepAmount(self, stepAmount)
-
-    local deltaTime      = Shared.GetTime() - self.stepStartTime
-    local prevStepAmount = 0
-    
-    if deltaTime < Player.stepTotalTime then
-        prevStepAmount = self.stepAmount * (1 - deltaTime / Player.stepTotalTime)
-    end        
-    
-    self.stepStartTime = Shared.GetTime()
-    self.stepAmount    = Clamp(stepAmount + prevStepAmount, -Player.kMaxStepAmount, Player.kMaxStepAmount)
-
-end
-
--- Check to see if we moved up a step and need to smooth out the movement.
-function Player:OnPositionUpdated(moveVector, stepAllowed)
-
-    if not Shared.GetIsRunningPrediction() then
-        if moveVector.y ~= 0 and stepAllowed then
-            UpdateStepAmount(self, moveVector.y)
-        end
-    end
-
-end
-
 function Player:GetPerformsVerticalMove()
     return false
 end
@@ -1279,16 +1236,6 @@ function Player:UpdateViewAngles(input)
     -- Update to the current view angles.    
     local viewAngles = Angles(input.pitch, input.yaw, 0)
     self:SetViewAngles(viewAngles)
-        
-    -- Update view offset from crouching
-
-    local viewY = self:GetMaxViewOffsetHeight()
-
-    -- Don't set new view offset height unless needed (avoids Vector churn).
-    local lastViewOffsetHeight = self:GetSmoothedViewOffset().y
-    if math.abs(viewY - lastViewOffsetHeight) > kEpsilon then
-        self:SetViewOffsetHeight(viewY)
-    end
     
     self:AdjustAngles(input.time)
     
@@ -1468,7 +1415,16 @@ end
 -- compensated fields are rolled back in time, so it needs to restore them once the processing
 -- is done. So it backs up, synchs to the old state, runs the OnProcessMove(), then restores them. 
 function Player:OnProcessMove(input)
+    // ensure that a player is always moving itself using full precision
+    self:SetOrigin(self.fullPrecisionOrigin)
+    -- Log("%s: TrackVel-0-start : vel=%s", self, self.velocity)
+    -- Log("%s: TrackYaw-0-input: input.yaw=%s|input.pitch=%s", self, input.yaw, input.pitch)
+    -- Log("%s: TrackYaw-1-start : y=%s|yR=%s|standY=%s|runY=", self, self.bodyYaw, self.bodyYawRun, self.standingBodyYaw, self.runningBodyYaw)
+    -- local startOrigin = self:GetEyePos()
+    -- Log("%s: TrackProcessMove-0-start : eye=%s|vel=%s", self, startOrigin, self:GetVelocity())
 
+    SetMoveForHitregAnalysis(input)
+    
     local commands = input.commands
     if self:GetIsAlive() then
     
@@ -1542,6 +1498,26 @@ function Player:OnProcessMove(input)
     if Client then
         self:ConfigurePhysicsCuller()
     end
+    
+    // for debugging hitreg; if hitreg scan is enabled, we generate a hitreg scan every move
+    // very spammy and wasteful of network resources
+    if self.hitregDebugAlways then
+        local viewAxis = self:GetViewAngles():GetCoords().zAxis
+        local startPoint = self:GetEyePos()
+        local endPoint = startPoint + viewAxis * 100
+        local trace = Shared.TraceRay(startPoint, endPoint, CollisionRep.Damage, PhysicsMask.Bullets, EntityFilterOne(self))
+        -- Log("%s: TrackHitreg-1 : view=%s|start=%s", self, viewAxis, startPoint)
+        HandleHitregAnalysis(self, startPoint, endPoint, trace)
+    end
+    
+    -- local amount = self:GetCrouchAmount()
+    -- local offset = -self:GetCrouchShrinkAmount() * amount
+    -- Log("%s: Crouching-2-Camera:offset=%s|amount=%s|time=%s|crouch=%s", self, offset, amount, self.timeOfCrouchChange, self.crouching)
+
+    -- local distMoved = self:GetEyePos() - startOrigin
+    -- Log("%s: TrackProcessMove-1-end : eye=%s|vel=%s|moved=%s", self, self:GetEyePos()(), self:GetVelocity(), distMoved)
+    -- Log("%s: TrackVel-1-end : vel=%s", self, self.velocity)
+    -- Log("%s: TrackY-1-end : startY=%s|y=%s", self, startOrigin.y, self:GetOrigin().y)
 end
 
 function Player:OnProcessSpectate(deltaTime)
@@ -1678,6 +1654,8 @@ function Player:SetOrigin(origin)
 
     Entity.SetOrigin(self, origin)
     
+    self.fullPrecisionOrigin = Vector(origin)
+    
     self:UpdateControllerFromEntity()
     
 end
@@ -1694,9 +1672,6 @@ end
 
 -- Called by client/server UpdateMisc()
 function Player:UpdateSharedMisc(input)
-
-    -- Update the view offet with the smoothed value.
-    self:SetViewOffsetHeight(self:GetSmoothedViewOffset().y)
     
     self:UpdateMode()
     
@@ -1972,7 +1947,8 @@ function Player:HandleButtons(input)
                                                                    Move.PrimaryAttack, Move.SecondaryAttack,
                                                                    Move.SelectNextWeapon, Move.SelectPrevWeapon, Move.Reload,
                                                                    Move.Taunt, Move.Weapon1, Move.Weapon2,
-                                                                   Move.Weapon3, Move.Weapon4, Move.Weapon5, Move.Crouch, Move.Drop, Move.MovementModifier)))
+                                                                   Move.Weapon3, Move.Weapon4, Move.Weapon5, 
+                                                                   Move.Crouch, Move.Drop, Move.MovementModifier)))
                                                                    
         input.move.x = 0
         input.move.y = 0
@@ -2426,17 +2402,6 @@ function Player:OnCreateCollisionModel()
     -- all of the movement collision will be handled by the controller.
     local collisionModel = self:GetCollisionModel()
     collisionModel:RemoveCollisionRep(CollisionRep.Move)
-    
-end
-
-function Player:OnAdjustModelCoords(modelCoords)
-    
-    local deltaTime = Shared.GetTime() - self.stepStartTime
-    if deltaTime < Player.stepTotalTime then
-        modelCoords.origin = modelCoords.origin - self.stepAmount * (1 - deltaTime / Player.stepTotalTime) * self:GetCoords().yAxis
-    end
-      
-    return modelCoords
     
 end
 

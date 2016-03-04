@@ -234,7 +234,18 @@ function Marine:OnCreate()
         InitMixin(self, DisorientableMixin)
         
     end
-
+    
+    self.weaponDropTime = 0
+    self.timeLastSpitHit = 0
+    self.lastSpitDirection = Vector(0, 0, 0)
+    self.timeOfLastDrop = 0
+    self.timeOfLastPickUpWeapon = 0
+    self.ruptured = false
+    self.interruptAim = false
+    self.catpackboost = false
+    self.timeCatpackboost = 0
+    self.flashlightLastFrame = false
+    
 end
 
 local function UpdateNanoArmor(self)
@@ -290,9 +301,6 @@ function Marine:OnInitialized()
     
     Player.OnInitialized(self)
     
-    // Calculate max and starting armor differently
-    self.armor = 0
-    
     if Server then
     
         self.armor = self:GetArmorAmount()
@@ -330,8 +338,6 @@ function Marine:OnInitialized()
         
     end
     
-    self.weaponDropTime = 0
-    
     local viewAngles = self:GetViewAngles()
     self.lastYaw = viewAngles.yaw
     self.lastPitch = viewAngles.pitch
@@ -339,17 +345,6 @@ function Marine:OnInitialized()
     // -1 = leftmost, +1 = right-most
     self.horizontalSwing = 0
     // -1 = up, +1 = down
-    
-    self.timeLastSpitHit = 0
-    self.lastSpitDirection = Vector(0, 0, 0)
-    self.timeOfLastDrop = 0
-    self.timeOfLastPickUpWeapon = 0
-    self.ruptured = false
-    self.interruptAim = false
-    self.catpackboost = false
-    self.timeCatpackboost = 0
-    
-    self.flashlightLastFrame = false
     
 end
 

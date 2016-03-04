@@ -963,7 +963,7 @@ if Server then
         local wasDisabled = false
         
         -- Check if auto-team balance should be enabled or disabled.
-        local autoTeamBalance = Server.GetConfigSetting("auto_team_balance")
+        local autoTeamBalance = not Shared.GetCheatsEnabled() and Server.GetConfigSetting("auto_team_balance")
         if autoTeamBalance and autoTeamBalance.enabled then
         
             local enabledOnUnbalanceAmount = autoTeamBalance.enabled_on_unbalance_amount or 2
@@ -1776,9 +1776,9 @@ if Server then
    
 
     function NS2Gamerules:GetWinConditionMet(marineWins, alienWins)
-        if (marineWins > 9) and ((marineWins - alienWins) >= 2) or self.team2:GetNumPlayers() < 1 then
+        if (marineWins > 3) and ((marineWins - alienWins) >= 2) or self.team2:GetNumPlayers() < 1 then
             return 1
-        elseif (alienWins > 9) and ((alienWins - marineWins) >= 2) or self.team1:GetNumPlayers() < 1 then
+        elseif (alienWins > 3) and ((alienWins - marineWins) >= 2) or self.team1:GetNumPlayers() < 1 then
             return 2
         else 
             return 0

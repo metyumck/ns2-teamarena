@@ -25,6 +25,19 @@ function GetHallucinationLifeTimeFraction(self)
 
 end
 
+function GetTargetOrigin(target)
+    
+    local targetOrigin = target:GetOrigin()
+    if target.GetModelOrigin then
+        targetOrigin = target:GetModelOrigin()
+    end
+    if target.GetEngagementPoint then
+        targetOrigin = target:GetEngagementPoint()
+    end    
+    return targetOrigin
+    
+end
+
 function SelectAllHallucinations(player)
 
     DeselectAllUnits(player:GetTeamNumber())
@@ -1570,52 +1583,31 @@ function SetPlayerPoseParameters(player, viewModel, headAngles)
     local x = Math.DotProduct(headCoords.xAxis, velocity)
     local z = Math.DotProduct(headCoords.zAxis, velocity)
     
-    local moveYaw
+    local moveYaw = Math.Wrap(Math.Degrees( math.atan2(z,x) ), -180, 180)
+
+    local moveSpeed = velocity:GetLength() / player:GetMaxSpeed(true)
     
-    if player.OverrideGetMoveYaw then
-        moveYaw = player:OverrideGetMoveYaw()
-    end
-    
-    if not moveYaw then
-        moveYaw = Math.Wrap(Math.Degrees( math.atan2(z,x) ), -180, 180)
-    end
-    
-    local speedScalar = velocity:GetLength() / player:GetMaxSpeed(true)
     local crouchAmount = HasMixin(player, "CrouchMove") and player:GetCrouchAmount() or 0
     if player.ModifyCrouchAnimation then
         crouchAmount = player:ModifyCrouchAnimation(crouchAmount)
     end
     
     player:SetPoseParam("move_yaw", moveYaw)
-    player:SetPoseParam("move_speed", speedScalar)
+    player:SetPoseParam("move_speed", moveSpeed)
     player:SetPoseParam("body_pitch", pitch)
     player:SetPoseParam("body_yaw", bodyYaw)
     player:SetPoseParam("body_yaw_run", bodyYawRun)
-
-    // Some code for debugging help
-    //if Client and not Shared.GetIsRunningPrediction() and self:isa("Skulk") then
-        //Print('speedScalar,%f,%f', Shared.GetSystemTime(), speedScalar)
-    //end
-
-    //player:SetPoseParam("move_yaw", 0)
-    //player:SetPoseParam("move_speed", 0)
-    //player:SetPoseParam("body_pitch", 0)
-    //player:SetPoseParam("body_yaw", 0)
-    //player:SetPoseParam("body_yaw_run", 0)
-
-    //Print("body yaw = %f, move_yaw = %f", bodyYaw, moveYaw);
-    
     player:SetPoseParam("crouch", crouchAmount)
     player:SetPoseParam("land_intensity", landIntensity)
     
     if viewModel then
     
-        viewModel:SetPoseParam("body_pitch", pitch)
         viewModel:SetPoseParam("move_yaw", moveYaw)
-        viewModel:SetPoseParam("move_speed", speedScalar)
-        viewModel:SetPoseParam("crouch", crouchAmount)
+        viewModel:SetPoseParam("move_speed", moveSpeed)
+        viewModel:SetPoseParam("body_pitch", pitch)
         viewModel:SetPoseParam("body_yaw", bodyYaw)
         viewModel:SetPoseParam("body_yaw_run", bodyYawRun)
+        viewModel:SetPoseParam("crouch", crouchAmount)
         viewModel:SetPoseParam("land_intensity", landIntensity)
         
     end
@@ -2144,6 +2136,8 @@ function CheckMeleeCapsule(weapon, player, damage, range, optionalCoords, traceR
     if not priorityFunc then
         priorityFunc = IsBetterMeleeTarget
     end
+
+    local selectedTrace = nil
     
     for _, pointIndex in ipairs(kTraceOrder) do
     
@@ -2154,10 +2148,12 @@ function CheckMeleeCapsule(weapon, player, damage, range, optionalCoords, traceR
         
         if dx == 0 and dy == 0 then
             middleTrace, middleStart = trace, sp
+	    selectedTrace = trace
         end
         
         if trace.entity and priorityFunc(weapon, player, trace.entity, target) and IsNotBehind(eyePoint, trace.endPoint, forwardDirection) then
-        
+            
+            selectedTrace = trace
             target = trace.entity
             startPoint = sp
             endPoint = trace.endPoint
@@ -2193,7 +2189,7 @@ function CheckMeleeCapsule(weapon, player, damage, range, optionalCoords, traceR
     startPoint = startPoint or middleStart
     
     local direction = target and (endPoint - startPoint):GetUnit() or coords.zAxis
-    return target ~= nil or middleTrace.fraction < 1, target, endPoint, direction, surface
+    return target ~= nil or middleTrace.fraction < 1, target, endPoint, direction, surface, startPoint, selectedTrace
     
 end
 
@@ -2205,6 +2201,7 @@ function PerformGradualMeleeAttack(weapon, player, damage, range, optionalCoords
     local didHitNow
     local damageMult = 1
     local stepSize = 1 / kNumMeleeZones
+    local trace
     
     for i = 1, kNumMeleeZones do
     
@@ -2227,7 +2224,7 @@ function PerformGradualMeleeAttack(weapon, player, damage, range, optionalCoords
         weapon:DoDamage(damage * damageMult, target, endPoint, direction, surface, altMode)
     end
     
-    return didHit, target, endPoint, direction, surface
+    return didHit, target, endPoint, direction, surface, trace
 
 end
 
@@ -2237,12 +2234,14 @@ end
 function AttackMeleeCapsule(weapon, player, damage, range, optionalCoords, altMode, filter)
 
     local targets = {}
-    local didHit, target, endPoint, direction, surface
+    local didHit, target, endPoint, direction, surface, startPoint, trace
     
     if not filter then
         filter = EntityFilterTwo(player, weapon)
     end
-
+    
+    // loop upto 20 times just to go through any soft targets. 
+    // Stops as soon as nothing is hit or a non-soft target is hit
     for i = 1, 20 do
     
         local traceFilter = function(test)
@@ -2250,7 +2249,7 @@ function AttackMeleeCapsule(weapon, player, damage, range, optionalCoords, altMo
         end
     
         // Enable tracing on this capsule check, last argument.
-        didHit, target, endPoint, direction, surface = CheckMeleeCapsule(weapon, player, damage, range, optionalCoords, true, 1, nil, traceFilter)
+        didHit, target, endPoint, direction, surface, startPoint, trace = CheckMeleeCapsule(weapon, player, damage, range, optionalCoords, true, 1, nil, traceFilter)
         local alreadyHitTarget = target ~= nil and table.contains(targets, target)
 
         if didHit and not alreadyHitTarget then
@@ -2267,6 +2266,8 @@ function AttackMeleeCapsule(weapon, player, damage, range, optionalCoords, altMo
     
     end
     
+    HandleHitregAnalysis(player, startPoint, endPoint, trace)
+
     return didHit, targets[#targets], endPoint, surface
     
 end
@@ -2788,11 +2789,21 @@ function EntityFilterList(list)
     return function(test) return table.contains(list, test) end
 end
 
+-- avoid problem with client generating a hit while server fails by shrinking client-side bullets a bit
+local kClientSideCaliberAdjustment = 0.00
 function GetBulletTargets(startPoint, endPoint, spreadDirection, bulletSize, filter)
 
     local targets = {}
     local hitPoints = {}
     local trace
+    
+    if Client then
+        if bulletSize < 2*kClientSideCaliberAdjustment then
+            bulletSize = bulletSize / 2
+        else
+            bulletSize = bulletSize - kClientSideCaliberAdjustment
+        end
+    end
     
     for i = 1, 20 do
     
