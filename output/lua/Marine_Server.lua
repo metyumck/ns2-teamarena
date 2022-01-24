@@ -1,11 +1,11 @@
-// ======= Copyright (c) 2003-2012, Unknown Worlds Entertainment, Inc. All rights reserved. =======
-//
-// lua\Marine_Server.lua
-//
-//    Created by:   Charlie Cleveland (charlie@unknownworlds.com) and
-//                  Max McGuire (max@unknownworlds.com)
-//
-// ========= For more information, visit us at http://www.unknownworlds.com =====================
+-- ======= Copyright (c) 2003-2012, Unknown Worlds Entertainment, Inc. All rights reserved. =======
+--
+-- lua\Marine_Server.lua
+--
+--    Created by:   Charlie Cleveland (charlie@unknownworlds.com) and
+--                  Max McGuire (max@unknownworlds.com)
+--
+-- ========= For more information, visit us at http:--www.unknownworlds.com =====================
 
 local function UpdateUnitStatusPercentage(self, target)
 
@@ -31,7 +31,7 @@ function Marine:SetUnitStatusPercentage(percentage)
     self.timeLastUnitPercentageUpdate = Shared.GetTime()
 end
 
-function Marine:OnTakeDamage(damage, attacker, doer, point)
+function Marine:OnTakeDamage(_, attacker, doer, _)
 
     if doer then
     
@@ -50,7 +50,7 @@ function Marine:OnTakeDamage(damage, attacker, doer, point)
             
         end
 
-        if (doer:isa("Gore") or doer:isa("Shockwave")) and not self:GetIsVortexed() then
+        if (doer:isa("Gore") or doer:isa("Shockwave")) and not attacker.isHallucination then
         
             self.interruptAim = true
             self.interruptStartTime = Shared.GetTime()
@@ -60,7 +60,6 @@ function Marine:OnTakeDamage(damage, attacker, doer, point)
     end
 
 end
-
 
 function Marine:GetDamagedAlertId()
     return kTechId.MarineAlertSoldierUnderAttack
@@ -75,21 +74,6 @@ function Marine:SetPoisoned(attacker)
         self.lastPoisonAttackerId = attacker:GetId()
     end
     
-end
-
-function Marine:ApplyCatPack()
-
-    self.catpackboost = true
-    self.timeCatpackboost = Shared.GetTime()
-    
-end
-
-function GetTeamScore()
-    if GetGamerules():GetGameStarted() ~= nil then
-        return GetGamerules():GetGameStarted()
-    else
-        return 15
-    end
 end
 
 function Marine:OnEntityChange(oldId, newId)
@@ -112,10 +96,21 @@ function Marine:CopyPlayerDataFrom(player)
 
     Player.CopyPlayerDataFrom(self, player)
     
-    if player.parasited and GetGamerules():GetGameStarted() then
-        self.timeParasited = player.timeParasited
-        self.parasited = player.parasited
-        self:OnParasited()
+    local playerInRR = player:GetTeamNumber() == kNeutralTeamType
+    
+    if not playerInRR and GetGamerules():GetGameStarted() then
+        
+        self.grenadesLeft = player.grenadesLeft
+        self.grenadeType = player.grenadeType
+        
+        self.minesLeft = player.minesLeft
+        
+        if player:isa("Marine") then
+            self:TransferParasite(player)
+        elseif player:isa("Exo") then
+            self:TransferParasite( { parasited = player.prevParasited, timeParasited = player.prevParasitedTime } ) 
+        end
+        
     end
     
 end
@@ -129,7 +124,13 @@ end
 
 function Marine:OnSprintStart()
     if self:GetIsAlive() then
-        if self:GetGenderString() == "female" then
+        local marineType = self:GetMarineTypeString()
+        
+        if marineType == "bigmac" then
+            return
+        end
+
+        if marineType == "female" then
              StartSoundEffectOnEntity(Marine.kSprintStartFemale, self)
         else 
              StartSoundEffectOnEntity(Marine.kSprintStart, self)
@@ -138,8 +139,14 @@ function Marine:OnSprintStart()
 end
  
 function Marine:OnSprintEnd(sprintDuration)
+    local marineType = self:GetMarineTypeString()
+
+    if marineType == "bigmac" then
+        return
+    end
+
     if sprintDuration > 5 then
-        if self:GetGenderString() == "female" then
+        if marineType == "female" then
              StartSoundEffectOnEntity(Marine.kSprintTiredEndFemale, self)
         else 
              StartSoundEffectOnEntity(Marine.kSprintTiredEnd, self)
@@ -171,7 +178,7 @@ local function GetHostSupportsTechId(forPlayer, host, techId)
     
     if host.GetItemList then
     
-        for index, supportedTechId in ipairs(host:GetItemList(forPlayer)) do
+        for _, supportedTechId in ipairs(host:GetItemList(forPlayer)) do
         
             if supportedTechId == techId then
             
@@ -194,11 +201,11 @@ function GetHostStructureFor(entity, techId)
     table.copy(GetEntitiesForTeamWithinRange("Armory", entity:GetTeamNumber(), entity:GetOrigin(), Armory.kResupplyUseRange), hostStructures, true)
     table.copy(GetEntitiesForTeamWithinRange("PrototypeLab", entity:GetTeamNumber(), entity:GetOrigin(), PrototypeLab.kResupplyUseRange), hostStructures, true)
     
-    if table.count(hostStructures) > 0 then
+    if table.icount(hostStructures) > 0 then
     
-        for index, host in ipairs(hostStructures) do
+        for _, host in ipairs(hostStructures) do
         
-            // check at first if the structure is hostign the techId:
+            -- check at first if the structure is hostign the techId:
             if GetHostSupportsTechId(entity,host, techId) then
                 return host
             end
@@ -212,38 +219,38 @@ function GetHostStructureFor(entity, techId)
 end
 
 function Marine:OnOverrideOrder(order)
-    
-    local orderTarget = nil
-    
-    if (order:GetParam() ~= nil) then
-        orderTarget = Shared.GetEntity(order:GetParam())
-    end
-    
-    // Default orders to unbuilt friendly structures should be construct orders
-    if(order:GetType() == kTechId.Default and GetOrderTargetIsConstructTarget(order, self:GetTeamNumber())) then
-    
+    local orderType = order:GetType()
+    if orderType ~= kTechId.Default then return end
+
+    local param = order:GetParam()
+    local orderTarget = param and Shared.GetEntity(param)
+
+    local teamNumber = self:GetTeamNumber()
+    -- Default orders to unbuilt friendly structures should be construct orders
+    if GetOrderTargetIsConstructTarget(order, teamNumber) then
+
         order:SetType(kTechId.Construct)
-        
-    elseif(order:GetType() == kTechId.Default and GetOrderTargetIsWeldTarget(order, self:GetTeamNumber())) and self:GetWeapon(Welder.kMapName) then
-    
+
+    -- Issue weld order for weldable targets. Powerpoints can be welded without a welder!
+    elseif GetOrderTargetIsWeldTarget(order, teamNumber) and (self:GetWeapon(Welder.kMapName) or orderTarget:isa("PowerPoint")) then
+
         order:SetType(kTechId.Weld)
-        
-    elseif order:GetType() == kTechId.Default and GetOrderTargetIsDefendTarget(order, self:GetTeamNumber()) then
-    
+
+    elseif GetOrderTargetIsDefendTarget(order, teamNumber) then
+
         order:SetType(kTechId.Defend)
 
-    // If target is enemy, attack it
-    elseif (order:GetType() == kTechId.Default) and orderTarget ~= nil and HasMixin(orderTarget, "Live") and GetEnemyTeamNumber(self:GetTeamNumber()) == orderTarget:GetTeamNumber() and orderTarget:GetIsAlive() and (not HasMixin(orderTarget, "LOS") or orderTarget:GetIsSighted()) then
-    
+    -- If target is enemy, attack it
+    elseif orderTarget and GetAreEnemies(orderTarget, self) and HasMixin(orderTarget, "Live") and orderTarget:GetIsAlive() and (not HasMixin(orderTarget, "LOS") or orderTarget:GetIsSighted()) then
+
         order:SetType(kTechId.Attack)
 
-    elseif order:GetType() == kTechId.Default then
-        
-        // Convert default order (right-click) to move order
+    else
+        -- Convert default order (right-click) to move order
         order:SetType(kTechId.Move)
-        
+
     end
-    
+
 end
 
 local function BuyExo(self, techId)
@@ -251,8 +258,8 @@ local function BuyExo(self, techId)
     local maxAttempts = 100
     for index = 1, maxAttempts do
     
-        // Find open area nearby to place the big guy.
-        local capsuleHeight, capsuleRadius = self:GetTraceCapsule()
+        -- Find open area nearby to place the big guy.
+        -- local capsuleHeight, capsuleRadius = self:GetTraceCapsule()
         local extents = Vector(Exo.kXZExtents, Exo.kYExtents, Exo.kXZExtents)
 
         local spawnPoint        
@@ -274,8 +281,8 @@ local function BuyExo(self, techId)
                 weapons[i]:SetParent(nil)            
             end
             
-            local exo = nil
-            
+            local exo
+
             if techId == kTechId.Exosuit then
                 exo = self:GiveExo(spawnPoint)
             elseif techId == kTechId.DualMinigunExosuit then
@@ -304,8 +311,14 @@ local function BuyExo(self, techId)
     
 end
 
-kIsExoTechId = { [kTechId.Exosuit] = true, [kTechId.DualMinigunExosuit] = true,
-                 [kTechId.ClawRailgunExosuit] = true, [kTechId.DualRailgunExosuit] = true }
+kIsExoTechId = 
+{
+    [kTechId.Exosuit] = true,
+    [kTechId.DualMinigunExosuit] = true,
+    [kTechId.ClawRailgunExosuit] = false,
+    [kTechId.DualRailgunExosuit] = true
+}
+
 function Marine:AttemptToBuy(techIds)
 
     local techId = techIds[1]
@@ -314,7 +327,7 @@ function Marine:AttemptToBuy(techIds)
         return true
     end
     
-    local mapName = LookupTechData(techId, kTechDataMapName)
+        local mapName = LookupTechData(techId, kTechDataMapName)
         
         if mapName then
         
@@ -323,12 +336,10 @@ function Marine:AttemptToBuy(techIds)
             if self:GetTeam() and self:GetTeam().OnBought then
                 self:GetTeam():OnBought(techId)
             end
-            
-            
-            
+                   
             if techId == kTechId.Jetpack then
 
-                // Need to apply this here since we change the class.
+                -- Need to apply this here since we change the class.
                 self:AddResources(-GetCostForTech(techId))
                 self:GiveJetpack()
                 
@@ -336,14 +347,43 @@ function Marine:AttemptToBuy(techIds)
                 BuyExo(self, techId)    
             else
             
-                // Make sure we're ready to deploy new weapon so we switch to it properly.
+                -- Make sure we're ready to deploy new weapon so we switch to it properly.
                 local newItem = self:GiveItem(mapName)
                 if newItem then
+
                     if newItem.UpdateWeaponSkins then
                         -- Apply weapon variant
                         newItem:UpdateWeaponSkins( self:GetClient() )
                     end
-                    StartSoundEffectAtOrigin(Marine.kGunPickupSound, self:GetOrigin())                    
+
+                    self:TriggerEffects("marine_weapon_pickup", { effecthostcoords = self:GetCoords() })
+
+                    if Server then
+
+                        -- Destroy any dropped weapons that are free, are the same weapon, and that we are the previous owner.
+                        -- This is to stop spamming "free" weapons like Rifle from being bought repeatedly at the armory.
+                        local cost = LookupTechData(newItem:GetTechId(), kTechDataCostKey, 0)
+                        if cost <= 0 then
+
+                            local filterFunction = CLambda [=[
+                            (...):GetWeaponWorldState() and
+                            (...).prevOwnerId == self[1]
+                            ]=] {self:GetId()}
+
+                            local weapons = Shared.GetEntitiesWithClassname(newItem:GetClassName())
+                            weapons = GetEntitiesWithFilter(weapons, filterFunction)
+
+                            for i = 1, #weapons do
+                                local weapon = weapons[i]
+                                if weapon then
+                                    DestroyEntity(weapon)
+                                end
+                            end
+
+                        end
+
+                    end
+
                     return true
                     
                 end
@@ -354,23 +394,23 @@ function Marine:AttemptToBuy(techIds)
             
         end
         
-        
+    end 
     
     return false
     
 end
 
+-- special threatment for mines and welders
+function Marine:GiveItem(itemMapName,setActive, suppressError)
+    local newItem
 
-
-// special threatment for mines and welders
-function Marine:GiveItem(itemMapName)
-
-    local newItem = nil
-
+    if setActive == nil then
+		setActive = true
+	end
+	
     if itemMapName then
         
         local continue = true
-        local setActive = true
         
         if itemMapName == LayMines.kMapName then
         
@@ -384,7 +424,7 @@ function Marine:GiveItem(itemMapName)
             
         elseif itemMapName == Welder.kMapName then
         
-            // since axe cannot be dropped we need to delete it before adding the welder (shared hud slot)
+            -- since axe cannot be dropped we need to delete it before adding the welder (shared hud slot)
             local switchAxe = self:GetWeapon(Axe.kMapName)
             
             if switchAxe then
@@ -392,13 +432,13 @@ function Marine:GiveItem(itemMapName)
                 DestroyEntity(switchAxe)
                 continue = true
             else
-                continue = false // don't give a second welder
+                continue = false -- don't give a second welder
             end
         
         end
         
         if continue == true then
-            return Player.GiveItem(self, itemMapName, setActive)
+            return Player.GiveItem(self, itemMapName, setActive, suppressError)
         end
         
     end
@@ -408,13 +448,25 @@ function Marine:GiveItem(itemMapName)
 end
 
 function Marine:DropAllWeapons()
-
-    local weaponSpawnCoords = self:GetAttachPointCoords(Weapon.kHumanAttachPoint)
+    
+    -- local weaponSpawnCoords = self:GetAttachPointCoords(Weapon.kHumanAttachPoint)
     local weaponList = self:GetHUDOrderedWeaponList()
+    
     for w = 1, #weaponList do
     
         local weapon = weaponList[w]
-        if weapon:GetIsDroppable() and LookupTechData(weapon:GetTechId(), kTechDataCostKey, 0) > 0 then
+    
+        if weapon:isa("GrenadeThrower") then
+            weapon:DropItLikeItsHot( self )
+            if weapon.grenadesLeft > 0 then
+                self.grenadesLeft = weapon.grenadesLeft
+                self.grenadeType = weapon.kMapName
+            end
+        elseif weapon:isa("LayMines") then
+            if weapon.minesLeft > 0 then
+                self.minesLeft = weapon.minesLeft
+            end
+        elseif weapon:GetIsDroppable() and LookupTechData(weapon:GetTechId(), kTechDataCostKey, 0) > 0 then
             self:Drop(weapon, true, true)
         end
         
@@ -425,29 +477,30 @@ end
 function Marine:OnKill(attacker, doer, point, direction)
     
     local lastWeaponList = self:GetHUDOrderedWeaponList()
+    
     self.lastWeaponList = { }
-    for _, weapon in pairs(lastWeaponList) do
+    for _, weapon in ipairs(lastWeaponList) do
         table.insert(self.lastWeaponList, weapon:GetMapName())
-        // If cheats are enabled, destroy the weapons so they don't drop
+        -- If cheats are enabled, destroy the weapons so they don't drop
         if Shared.GetCheatsEnabled() and weapon:GetIsDroppable() and LookupTechData(weapon:GetTechId(), kTechDataCostKey, 0) > 0 then
             DestroyEntity(weapon)
         end
     end
-
-    // Drop all weapons which cost resources
+    
+    -- Drop all weapons which cost resources
     self:DropAllWeapons()
     
-    // Destroy remaining weapons
+    -- Destroy remaining weapons
     self:DestroyWeapons()
     
     Player.OnKill(self, attacker, doer, point, direction)
     
-    // Don't play alert if we suicide
+    -- Don't play alert if we suicide
     if attacker ~= self then
         self:GetTeam():TriggerAlert(kTechId.MarineAlertSoldierLost, self)
     end
     
-    // Note: Flashlight is powered by Marine's beating heart. Eco friendly.
+    -- Note: Flashlight is powered by Marine's beating heart. Eco friendly.
     self:SetFlashlightOn(false)
     self.originOnDeath = self:GetOrigin()
     
@@ -460,7 +513,7 @@ end
 function Marine:GiveJetpack()
 
     local activeWeapon = self:GetActiveWeapon()
-    local activeWeaponMapName = nil
+    local activeWeaponMapName
     local health = self:GetHealth()
     
     if activeWeapon ~= nil then
@@ -474,47 +527,31 @@ function Marine:GiveJetpack()
     
 end
 
-local function StorePrevPlayer(self, exo)
 
-    exo.prevPlayerMapName = self:GetMapName()
-    exo.prevPlayerHealth = self:GetHealth()
-    exo.prevPlayerMaxArmor = self:GetMaxArmor()
-    exo.prevPlayerArmor = self:GetArmor()
-    
-end
+function Marine:GiveExo(spawnPoint, isPickup)
 
-function Marine:GiveExo(spawnPoint)
-
-    local exo = self:Replace(Exo.kMapName, self:GetTeamNumber(), false, spawnPoint, { layout = "ClawMinigun" })
-    StorePrevPlayer(self, exo)
-    
+    local exo = self:Replace(Exo.kMapName, self:GetTeamNumber(), false, spawnPoint, { layout = "MinigunMinigun" }, isPickup)
     return exo
     
 end
 
-function Marine:GiveDualExo(spawnPoint)
+function Marine:GiveDualExo(spawnPoint, isPickup)
 
-    local exo = self:Replace(Exo.kMapName, self:GetTeamNumber(), false, spawnPoint, { layout = "MinigunMinigun" })
-    StorePrevPlayer(self, exo)
-    
+    local exo = self:Replace(Exo.kMapName, self:GetTeamNumber(), false, spawnPoint, { layout = "MinigunMinigun" }, isPickup)
     return exo
     
 end
 
-function Marine:GiveClawRailgunExo(spawnPoint)
+function Marine:GiveClawRailgunExo(spawnPoint, isPickup)
 
-    local exo = self:Replace(Exo.kMapName, self:GetTeamNumber(), false, spawnPoint, { layout = "ClawRailgun" })
-    StorePrevPlayer(self, exo)
-    
+    local exo = self:Replace(Exo.kMapName, self:GetTeamNumber(), false, spawnPoint, { layout = "ClawRailgun" }, isPickup)
     return exo
     
 end
 
-function Marine:GiveDualRailgunExo(spawnPoint)
+function Marine:GiveDualRailgunExo(spawnPoint, isPickup)
 
-    local exo = self:Replace(Exo.kMapName, self:GetTeamNumber(), false, spawnPoint, { layout = "RailgunRailgun" })
-    StorePrevPlayer(self, exo)
-    
+    local exo = self:Replace(Exo.kMapName, self:GetTeamNumber(), false, spawnPoint, { layout = "RailgunRailgun" }, isPickup)
     return exo
     
 end

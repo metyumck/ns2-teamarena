@@ -13,19 +13,10 @@
     <filename>Alien_Client.lua</filename>
   </file>
   <file>
-    <filename>Alien_Server.lua</filename>
-  </file>
-  <file>
     <filename>Balance.lua</filename>
   </file>
   <file>
-    <filename>BalanceMisc.lua</filename>
-  </file>
-  <file>
     <filename>CommandStructure.lua</filename>
-  </file>
-  <file>
-    <filename>GUIAlienBuyMenu.lua</filename>
   </file>
   <file>
     <filename>GUIAlienHUD.lua</filename>
@@ -91,9 +82,6 @@
     <filename>Scoreboard.lua</filename>
   </file>
   <file>
-    <filename>Shared.lua</filename>
-  </file>
-  <file>
     <filename>Team.lua</filename>
   </file>
   <file>
@@ -110,12 +98,6 @@
   </file>
   <file>
     <filename>TeamMessenger.lua</filename>
-  </file>
-  <file>
-    <filename>TeamMixin.lua</filename>
-  </file>
-  <file>
-    <filename>TechData.lua</filename>
   </file>
   <file>
     <filename>TechNode.lua</filename>

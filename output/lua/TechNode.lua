@@ -1,31 +1,31 @@
-// ======= Copyright (c) 2003-2011, Unknown Worlds Entertainment, Inc. All rights reserved. =======
-//
-// lua\TechNode.lua
-//
-// Represents one item in the tech tree. They also characterize the behavior when triggering that kind of action.
-// Tech nodes are of the following types:
-//
-//   Order (Move, Default) - No cost, requires positional
-//   Research (eg, research siege) - Costs team resources, queued from a structure, non-positional
-//   Upgrade (eg, upgrade command station) - Like research but can be performed more than once
-//   Action (eg, medpack) - Optionally costs energy, optional position, optionally must be researched
-//   Buy (eg, create siege cannon from factory, player buy weapon) - Costs resources, position implied from buyer 
-//      or originating structure (unless targeted). Requires target for commander. Can be built on entities.
-//   Build (eg, build structure from drifter) - Costs team resources, requires position
-//   EnergyManufacture (add to manufacture queue, create unit when done) - Costs energy, takes time to complete, no 
-//      position (MACs, Drifters). Only use for AI units that don't need a position.
-//   PlasmaManufacture (add to manufacture queue, create unit when done) - Costs player resources, takes time to 
-//      complete, no position (MACs, Drifters). Only use for AI units that don't need a position.
-//   Manufacture (add to manufacture queue, create unit when done) - Costs resources, takes time to complete, no 
-//      position (ARCs)
-//   Activation (eg, deploy/undeploy siege) - Optionally costs energy, optional position
-//   Menu - No cost, no position
-//
-//    Created by:   Charlie Cleveland (charlie@unknownworlds.com) and
-//                  Max McGuire (max@unknownworlds.com)
-//
-// ========= For more information, visit us at http://www.unknownworlds.com =====================
-//Script.Load("lua/TechData.lua")
+-- ======= Copyright (c) 2003-2011, Unknown Worlds Entertainment, Inc. All rights reserved. =======
+--
+-- lua\TechNode.lua
+--
+-- Represents one item in the tech tree. They also characterize the behavior when triggering that kind of action.
+-- Tech nodes are of the following types:
+--
+--   Order (Move, Default) - No cost, requires positional
+--   Research (eg, research siege) - Costs team resources, queued from a structure, non-positional
+--   Upgrade (eg, upgrade command station) - Like research but can be performed more than once
+--   Action (eg, medpack) - Optionally costs energy, optional position, optionally must be researched
+--   Buy (eg, create siege cannon from factory, player buy weapon) - Costs resources, position implied from buyer 
+--      or originating structure (unless targeted). Requires target for commander. Can be built on entities.
+--   Build (eg, build structure from drifter) - Costs team resources, requires position
+--   EnergyManufacture (add to manufacture queue, create unit when done) - Costs energy, takes time to complete, no 
+--      position (MACs, Drifters). Only use for AI units that don't need a position.
+--   PlasmaManufacture (add to manufacture queue, create unit when done) - Costs player resources, takes time to 
+--      complete, no position (MACs, Drifters). Only use for AI units that don't need a position.
+--   Manufacture (add to manufacture queue, create unit when done) - Costs resources, takes time to complete, no 
+--      position (ARCs)
+--   Activation (eg, deploy/undeploy siege) - Optionally costs energy, optional position
+--   Menu - No cost, no position
+--
+--    Created by:   Charlie Cleveland (charlie@unknownworlds.com) and
+--                  Max McGuire (max@unknownworlds.com)
+--
+-- ========= For more information, visit us at http://www.unknownworlds.com =====================
+--Script.Load("lua/TechData.lua")
 
 Script.Load("lua/Globals.lua")
 
@@ -56,8 +56,6 @@ function TechNode:Initialize(techId, techType, prereq1, prereq2)
     
     self.addOnTechId = kTechId.None
     
-    self.cost = LookupTechData(self.techId, kTechDataCostKey, 0)
-    
     self.available = false
     
     self.time = 0
@@ -73,7 +71,13 @@ function TechNode:Initialize(techId, techType, prereq1, prereq2)
     self.researching = false
     
     self.requiresTarget = false
-    
+
+    if GetTechIdIsInstanced(self.techId) then
+
+        self.instances = IterableDict()
+
+    end
+
 end
 
 function TechNode:DumpNode()
@@ -84,7 +88,7 @@ function TechNode:DumpNode()
     Print("self.prereq1 %s", ToString(self.prereq1))
     Print("self.prereq2 %s", ToString(self.prereq2))
     Print("self.addOnTechId %s", ToString(self.addOnTechId))
-    Print("self.cost %s", ToString(self.cost))
+    Print("self.cost %s", ToString(self:GetCost()))
     Print("self.time %s", ToString(self.time))
     Print("self.researchProgress %s", ToString(self.researchProgress))
     Print("self.prereqResearchProgress %s", ToString(self.prereqResearchProgress))
@@ -98,6 +102,8 @@ function TechNode:DumpNode()
 end
 
 function TechNode:GetResearched()
+    if GetWarmupActive() then return true end
+
     return self.researched
 end
 
@@ -117,16 +123,16 @@ function TechNode:GetIsSpecial()
     return self.techType == kTechType.Special
 end
 
-// Returns: 0 = team resources, 1 = individual resources, 2 = energy (from CommanderUI_MenuButtonTooltip). Returns nil if none required.
+-- Returns: 0 = team resources, 1 = individual resources, 2 = energy (from CommanderUI_MenuButtonTooltip). Returns nil if none required.
 function TechNode:GetResourceType()
 
-    // Team resources
+    -- Team resources
     if self.techType == kTechType.Research or self.techType == kTechType.Upgrade or self.techType == kTechType.Build or self.techType == kTechType.Manufacture or self.techType == kTechType.Activation then
         return kResourceType.Team
-    // Personal Resources
+    -- Personal Resources
     elseif self.techType == kTechType.Action or self.techType == kTechType.Buy or self.techType == kTechType.PlasmaManufacture then
         return kResourceType.Personal
-    // Energy
+    -- Energy
     elseif self.techType == kTechType.EnergyBuild or self.techType == kTechType.EnergyManufacture then
         return kResourceType.Energy
     end
@@ -204,14 +210,40 @@ function TechNode:SetPrereq2(prereq2)
 end
 
 function TechNode:GetCost()
-    return self.cost
+    return LookupTechData(self.techId, kTechDataCostKey, 0)
 end
 
-function TechNode:SetResearchProgress(progress)
+function TechNode:SetResearchProgress(progress, entityId)
+
     self.researchProgress = progress
+
+    if self.instances and entityId and entityId ~= Entity.invalidId then
+
+        local removed = progress == 1
+
+        if self.instances[entityId] then
+
+            self.instances[entityId].progress = progress
+            self.instances[entityId].researchId = self.techId
+            self.instances[entityId].removed = removed
+
+        else
+
+            self.instances[entityId] = { progress = progress, researchId = self.techId, removed = removed }
+
+        end
+    end
 end
 
-function TechNode:GetResearchProgress()
+function TechNode:GetResearchProgress(entityId)
+
+    if self.instances and entityId and entityId ~= Entity.invalidId then
+
+        local instance = self.instances[entityId]
+        return instance and instance.progress or nil
+
+    end
+
     return self.researchProgress
 end
 
@@ -223,7 +255,7 @@ function TechNode:GetPrereqResearchProgress()
     return self.prereqResearchProgress
 end
 
-// Indicates if we this tech node can be bought, researched, etc.
+-- Indicates if we this tech node can be bought, researched, etc.
 function TechNode:GetAvailable()
     return true
 end
@@ -238,8 +270,10 @@ function TechNode:GetCanResearch()
     
 end
 
-// True if this is tech node represents a structure that is built or if the tech is satisfied (Hive, TwoCommandStations, etc.)
+-- True if this is tech node represents a structure that is built or if the tech is satisfied (Hive, TwoCommandStations, etc.)
 function TechNode:GetHasTech()
+    if GetWarmupActive() then return true end
+
     return self.hasTech
 end
 
@@ -261,14 +295,22 @@ function TechNode:SetResearching()
 
 end
 
-function TechNode:ClearResearching()
+function TechNode:ClearResearching(entityId)
 
     self.researching = false
     self.researchProgress = 0
+
+    if self.instances and entityId and entityId ~= Entity.invalidId then
+
+        if self.instances[entityId] then
+            self.instances[entityId].removed = true
+        end
+
+    end
         
 end
 
-// Make sure to call TechTree:ComputeAvailability() after making a change here.
+-- Make sure to call TechTree:ComputeAvailability() after making a change here.
 function TechNode:SetResearched(state)
 
     ASSERT(state ~= nil)

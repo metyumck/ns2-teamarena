@@ -19,38 +19,52 @@
 Script.Load("lua/Insight.lua")
 
 -- primary lookup table with clientIndex (clientId) as key
-local playerData = { }
+local playerData = unique_map()
+
 -- index with player name as key
 local playerDataByName = { }
+
 -- sorted list by score
 local sortedPlayerData = { }
 
 local lastPlayerDataUpdateTime = 0
 local kMaxPlayerDataAge = 0.5
 
+local kLastMarineCommanderInfo
+local kLastAlienCommanderInfo
+
+-- For Death Messages
+function Scoreboard_GetLastMarineCommanderInfo()
+    return kLastMarineCommanderInfo
+end
+
+function Scoreboard_GetLastAlienCommanderInfo()
+    return kLastAlienCommanderInfo
+end
 
 local kStatusTranslationStringMap = {
-    [kPlayerStatus.Dead]="STATUS_DEAD",
-    [kPlayerStatus.Evolving]="STATUS_EVOLVING",
-    [kPlayerStatus.Embryo]="STATUS_EMBRYO",
-    [kPlayerStatus.Commander]="STATUS_COMMANDER",
-    [kPlayerStatus.Exo]="STATUS_EXO",
-    [kPlayerStatus.GrenadeLauncher]="STATUS_GRENADE_LAUNCHER",
-    [kPlayerStatus.Rifle]="STATUS_RIFLE",
-    [kPlayerStatus.Shotgun]="STATUS_SHOTGUN",
-    [kPlayerStatus.Flamethrower]="STATUS_FLAMETHROWER",
-    [kPlayerStatus.Void]="STATUS_VOID",
-    [kPlayerStatus.Spectator]="STATUS_SPECTATOR",
-    [kPlayerStatus.Skulk]="STATUS_SKULK",
-    [kPlayerStatus.Gorge]="STATUS_GORGE",
-    [kPlayerStatus.Lerk]="STATUS_LERK",
-    [kPlayerStatus.Fade]="STATUS_FADE",
-    [kPlayerStatus.Onos]="STATUS_ONOS",
-    [kPlayerStatus.SkulkEgg]="SKULK_EGG",
-    [kPlayerStatus.GorgeEgg]="GORGE_EGG",
-    [kPlayerStatus.LerkEgg]="LERK_EGG",
-    [kPlayerStatus.FadeEgg]="FADE_EGG",
-    [kPlayerStatus.OnosEgg]="ONOS_EGG",
+    [kPlayerStatus.Dead] = "STATUS_DEAD",
+    [kPlayerStatus.Evolving] = "STATUS_EVOLVING",
+    [kPlayerStatus.Embryo] = "STATUS_EMBRYO",
+    [kPlayerStatus.Commander] = "STATUS_COMMANDER",
+    [kPlayerStatus.Exo] = "STATUS_EXO",
+    [kPlayerStatus.GrenadeLauncher] = "STATUS_GRENADE_LAUNCHER",
+    [kPlayerStatus.Rifle] = "STATUS_RIFLE",
+    [kPlayerStatus.HeavyMachineGun] = "STATUS_HMG",
+    [kPlayerStatus.Shotgun] = "STATUS_SHOTGUN",
+    [kPlayerStatus.Flamethrower] = "STATUS_FLAMETHROWER",
+    [kPlayerStatus.Void] = "STATUS_VOID",
+    [kPlayerStatus.Spectator] = "STATUS_SPECTATOR",
+    [kPlayerStatus.Skulk] = "STATUS_SKULK",
+    [kPlayerStatus.Gorge] = "STATUS_GORGE",
+    [kPlayerStatus.Lerk] = "STATUS_LERK",
+    [kPlayerStatus.Fade] = "STATUS_FADE",
+    [kPlayerStatus.Onos] = "STATUS_ONOS",
+    [kPlayerStatus.SkulkEgg] = "SKULK_EGG",
+    [kPlayerStatus.GorgeEgg] = "GORGE_EGG",
+    [kPlayerStatus.LerkEgg] = "LERK_EGG",
+    [kPlayerStatus.FadeEgg] = "FADE_EGG",
+    [kPlayerStatus.OnosEgg] = "ONOS_EGG",
 }
 
 -- reloads the player data. Should be no need to call this, as player data is reloaded on demand
@@ -70,14 +84,13 @@ function Scoreboard_ReloadPlayerData()
         if pie.status == kPlayerStatus.VIP then
             statusTxt = "VIP"
         end
-        
-        
-        local playerRecord = playerData[pie.clientId]
+
+        local clientId = pie.clientId        
+        local playerRecord = playerData:Get(clientId)
         if playerRecord == nil then
             playerRecord = {}
-            
-            playerData[pie.clientId] = playerRecord
-            
+            playerData:Insert(clientId, playerRecord)
+
             playerRecord.ClientIndex = pie.clientId
             playerRecord.IsSteamFriend = Client.GetIsSteamFriend(pie.steamId)
             playerRecord.Ping = 0
@@ -95,11 +108,51 @@ function Scoreboard_ReloadPlayerData()
         playerRecord.IsCommander = pie.isCommander
         playerRecord.IsRookie = pie.isRookie
         playerRecord.Status = statusTxt
+        playerRecord.StatusId = pie.status
         playerRecord.IsSpectator = pie.isSpectator
         playerRecord.Assists = pie.assists
         playerRecord.SteamId = pie.steamId
         playerRecord.Skill = pie.playerSkill
+        playerRecord.AdagradSum = pie.adagradSum
         playerRecord.Tech = pie.currentTech
+        playerRecord.CallingCard = pie.callingCard
+
+        if playerRecord.IsCommander then
+
+            local playerEnt = Shared.GetEntity(playerRecord.EntityId)
+            if playerEnt then
+
+                local commanderTeam = playerEnt:GetTeamType()
+                if commanderTeam == kMarineTeamType then
+                    kLastMarineCommanderInfo =
+                    {
+                        CallingCard = playerRecord.CallingCard,
+                        Name = playerRecord.Name,
+
+                        -- Skill Badge Info
+                        SteamId32 = playerRecord.SteamId, -- Bot? == 0
+                        Skill = playerRecord.Skill,
+                        AdagradSum = playerRecord.AdagradSum,
+                        Rookie = playerRecord.IsRookie
+                    }
+                elseif commanderTeam == kAlienTeamType then
+                    kLastAlienCommanderInfo =
+                    {
+                        CallingCard = playerRecord.CallingCard,
+                        Name = playerRecord.Name,
+
+                        -- Skill Badge Info
+                        SteamId32 = playerRecord.SteamId, -- Bot? == 0
+                        Skill = playerRecord.Skill,
+                        AdagradSum = playerRecord.AdagradSum,
+                        Rookie = playerRecord.IsRookie
+                    }
+                end
+
+            end
+
+
+        end
         
     end
     
@@ -107,37 +160,42 @@ function Scoreboard_ReloadPlayerData()
     playerDataByName = { }
     
     -- clean out old player records
-    for clientIndex, playerRecord in pairs(playerData) do
+    for clientIndex, playerRecord in playerData:IterateBackwards() do
         if lastPlayerDataUpdateTime - playerRecord.LastUpdateTime > kMaxPlayerDataAge then
-            playerData[clientIndex] = nil
+            playerData:Remove(clientIndex)
         else
             table.insert(sortedPlayerData, playerRecord)
             playerDataByName[playerRecord.Name] = playerRecord
-        end         
+        end
     end
-    
+
     Scoreboard_Sort()
-    
+
 end
 
 -- call this to ensure that the data is reasonably up-to-date
 local function CheckForReload()
+
     if Shared.GetTime() - lastPlayerDataUpdateTime > kMaxPlayerDataAge then
         Scoreboard_ReloadPlayerData()
         return true
     end
+
     return false
 end
 
 -- Returns the playerRecord for the given players clientIndex, reloading player data if required
 function Scoreboard_GetPlayerRecord(clientIndex)
     
-    if not CheckForReload() and playerData[clientIndex] == nil then
+    PROFILE("Scoreboard_GetPlayerRecord")
+    
+    if not CheckForReload() and playerData:Get(clientIndex) == nil then
+        -- updates playerData
         Scoreboard_ReloadPlayerData()
     end
-    
-    return playerData[clientIndex]
-    
+
+    return playerData:Get(clientIndex)
+
 end
 
 -- Returns the playerRecord for the given players name, reloading player data if required
@@ -165,76 +223,73 @@ end
 
 function Scoreboard_Clear()
 
-    playerData = { }
+    playerData:Clear()
     Insight_Clear()
     
 end
 
 -- Score > Kills > Deaths > Resources
-function Scoreboard_Sort()
+local function sortByScore(player1, player2)
 
-    local function sortByScore(player1, player2)
-    
-        if player1.EntityTeamNumber == player2.EntityTeamNumber then
-        
-            if player1.Score == player2.Score then
-            
-                if player1.Kills == player2.Kills then
-                
-                    if player1.Deaths == player2.Deaths then    
-                    
-                        if player1.Resources == player2.Resources then    
-                        
-                            -- Somewhat arbitrary but keeps more coherence and adds players to bottom in case of ties
-                            return player1.ClientIndex > player2.ClientIndex
-                            
-                        else
-                            return player1.Resources > player2.Resources
-                        end
-                        
+    if player1.EntityTeamNumber == player2.EntityTeamNumber then
+
+        if player1.Score == player2.Score then
+
+            if player1.Kills == player2.Kills then
+
+                if player1.Deaths == player2.Deaths then
+
+                    if player1.Resources == player2.Resources then
+
+                        -- Somewhat arbitrary but keeps more coherence and adds players to bottom in case of ties
+                        return player1.ClientIndex > player2.ClientIndex
+
                     else
-                        return player1.Deaths < player2.Deaths
+                        return player1.Resources > player2.Resources
                     end
-                    
-                else
-                    return player1.Kills > player2.Kills
-                end
-                
-            else
-                return player1.Score > player2.Score    
-            end
-            
-        else
-            -- Spectators should be at the top of the RR "team"
-            -- Spectators are team 3 and RR players are team 0
-            return player1.EntityTeamNumber > player2.EntityTeamNumber
-        end
-    end
-        
-    table.sort(sortedPlayerData, sortByScore)
 
+                else
+                    return player1.Deaths < player2.Deaths
+                end
+
+            else
+                return player1.Kills > player2.Kills
+            end
+
+        else
+            return player1.Score > player2.Score
+        end
+
+    else
+        -- Spectators should be at the top of the RR "team"
+        -- Spectators are team 3 and RR players are team 0
+        return player1.EntityTeamNumber > player2.EntityTeamNumber
+    end
+end
+
+function Scoreboard_Sort()
+    table.sort(sortedPlayerData, sortByScore)
 end
 
 function Scoreboard_SetPing(clientIndex, ping)
     -- setting ping does not cause a reload for missing player data
-    if playerData[clientIndex] then
-        playerData[clientIndex].Ping = ping
+    local playerRecord = playerData:Get(clientIndex)
+    if playerRecord then
+        playerRecord.Ping = ping
     end
-    
+
 end
 
 -- Set local data for player so scoreboard updates instantly (used only in test)
-function Scoreboard_SetLocalPlayerData(playerName, index, data)
-  
-    playerData[index] = data
-        
+function Scoreboard_SetLocalPlayerData(_, index, data)
+    playerData:Insert(index, data)
 end
 
 
 function Scoreboard_GetPlayerName(clientIndex)
 
     local record = Scoreboard_GetPlayerRecord(clientIndex)
-    return record and record.Name
+    return record and record.Name or "Admin"
     
 end
 
@@ -255,6 +310,9 @@ function Scoreboard_GetPlayerList()
 end
 
 function Scoreboard_GetPlayerData(clientIndex, dataType)
+        
+    PROFILE("Scoreboard_GetPlayerData")
+    
     -- often used to avoid a null-check
     local playerRecord = Scoreboard_GetPlayerRecord(clientIndex)
     return playerRecord and playerRecord[dataType]
@@ -264,34 +322,40 @@ end
 --[[
  * Get table of scoreboard player records for all players with team numbers in specified table.
 ]]
-function GetScoreData(teamNumberTable)
+function GetScoreData(teamNumberArray)
 
-    local scoreData = { }
-    local commanders = { }
-    
-    local localTeamNumber = Client.GetLocalClientTeamNumber()   
+    local scoreData = {}
+    local players = {}
 
-    for index, playerRecord in ipairs(sortedPlayerData) do
-        if table.find(teamNumberTable, playerRecord.EntityTeamNumber) then
-        
-            local isVisibleTeam = localTeamNumber == kSpectatorIndex or playerRecord.EntityTeamNumber == localTeamNumber
+    local localTeamNumber = Client.GetLocalClientTeamNumber()
+
+    -- convert array into set for faster lookups inside loop
+    local teamNumberSet = unique_set()
+    teamNumberSet:InsertAll(teamNumberArray)
+
+    -- first insert commanders so they are on top of the scoreData
+    for _, playerRecord in ipairs(sortedPlayerData) do
+        local playerTeamNumber = playerRecord.EntityTeamNumber
+        if teamNumberSet:Contains(playerTeamNumber) then
+
+            local isVisibleTeam = localTeamNumber == kSpectatorIndex or playerTeamNumber == localTeamNumber
             local isCommander = playerRecord.IsCommander and isVisibleTeam
-        
+
             if not isCommander then
-                table.insert(scoreData, playerRecord)
+                table.insert(players, playerRecord)
             else
-                table.insert(commanders, playerRecord)
-            end    
-                
+                table.insert(scoreData, playerRecord)
+            end
+
         end
     end
-    
-    for _, commander in ipairs(commanders) do
-        table.insert(scoreData, 1, commander)
+
+    -- then insert all players
+    for _, playerRecord in ipairs(players) do
+        table.insert(scoreData, playerRecord)
     end
-    
+
     return scoreData
-    
 end
 
 --[[
@@ -322,10 +386,10 @@ end
 function ScoreboardUI_GetTeamResources(teamNumber)
 
     local teamInfo = GetEntitiesForTeam("TeamInfo", teamNumber)
-    if table.count(teamInfo) > 0 then
+    if #teamInfo > 0 then
         return teamInfo[1]:GetTeamResources()
     end
-    
+
     return 0
 
 end
@@ -354,20 +418,29 @@ end
 --[[
  * Return true if playerName is a local player.
 ]]
+kActualClientId = nil
 function ScoreboardUI_IsPlayerLocal(playerName)
-    
+
     local player = Client.GetLocalPlayer()
-    
+
+    -- make the scoreboard use the player's actual id to highlight
+    local clientId = player:GetClientIndex()
+    if Client.GetIsControllingPlayer() then
+        kActualClientId = clientId
+    else
+        clientId = kActualClientId or clientId
+    end
+
     -- Get entry with this name and check entity id
     if player then
-      
-        local playerRecord = Scoreboard_GetPlayerRecord(player:GetClientIndex())     
+
+        local playerRecord = Scoreboard_GetPlayerRecord(clientId)
         return playerRecord and playerName == playerRecord.Name
-        
+
     end
-    
+
     return false
-    
+
 end
 
 function ScoreboardUI_IsPlayerCommander(playerName)
@@ -406,66 +479,68 @@ end
 function ScoreboardUI_GetCommanderName(teamNumber)
 
     CheckForReload()
-    
-    for i = 1, table.maxn(sortedPlayerData) do
-    
+
+    for i = 1, #sortedPlayerData do
+
         local playerRecord = sortedPlayerData[i]
-        
-        if (playerRecord.EntityTeamNumber == teamNumber) and playerRecord.IsCommander then
+        if playerRecord.EntityTeamNumber == teamNumber and playerRecord.IsCommander then
             return playerRecord.Name
         end
-        
+
     end
-    
+
     return nil
-    
+
 end
 
+-- Expensive! Avoid usage!
 function ScoreboardUI_GetOrderedCommanderNames(teamNumber)
-  
+
     CheckForReload()
     local commanders = {}
-    
+
     -- Create table of commander entity ids and names
-    for i = 1, table.maxn(sortedPlayerData) do
-    
+    for i = 1, #sortedPlayerData do
+
         local playerRecord = sortedPlayerData[i]
-        
-        if (playerRecord.EntityTeamNumber == teamNumber) and playerRecord.IsCommander then
+
+        if playerRecord.EntityTeamNumber == teamNumber and playerRecord.IsCommander then
             table.insert( commanders, {playerRecord.EntityId, playerRecord.Name} )
         end
-        
+
     end
-    
+
     local function sortCommandersByEntity(pair1, pair2)
         return pair1[1] < pair2[1]
     end
-    
+
     -- Sort it by entity id
     table.sort(commanders, sortCommandersByEntity)
-    
-    --http Return names in order
+
+    -- Return names in order
     local commanderNames = {}
-    for index, pair in ipairs(commanders) do
+    for _, pair in ipairs(commanders) do
         table.insert(commanderNames, pair[2])
     end
-    
+
     return commanderNames
-    
+
 end
 
+-- Expensive! Avoid usage!
 function ScoreboardUI_GetNumberOfAliensByType(alienType)
-  
+
     CheckForReload()
     local numberOfAliens = 0
-    
-    for index, playerRecord in ipairs(sortedPlayerData) do
-        if alienType == playerRecord.Status then
+
+    local typeId = kPlayerStatus[alienType]
+
+    for _, playerRecord in ipairs(sortedPlayerData) do
+        if typeId and typeId == playerRecord.StatusId then
             numberOfAliens = numberOfAliens + 1
         end
     end
-    
+
     return numberOfAliens
 
 end
-

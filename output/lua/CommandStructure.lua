@@ -1,11 +1,11 @@
-// ======= Copyright (c) 2003-2011, Unknown Worlds Entertainment, Inc. All rights reserved. =======
-//
-// lua\CommandStructure.lua
-//
-//    Created by:   Charlie Cleveland (charlie@unknownworlds.com) and
-//                  Max McGuire (max@unknownworlds.com)
-//
-// ========= For more information, visit us at http://www.unknownworlds.com =====================
+-- ======= Copyright (c) 2003-2011, Unknown Worlds Entertainment, Inc. All rights reserved. =======
+--
+-- lua\CommandStructure.lua
+--
+--    Created by:   Charlie Cleveland (charlie@unknownworlds.com) and
+--                  Max McGuire (max@unknownworlds.com)
+--
+-- ========= For more information, visit us at http://www.unknownworlds.com =====================
 
 Script.Load("lua/Mixins/ModelMixin.lua")
 Script.Load("lua/LiveMixin.lua")
@@ -26,6 +26,7 @@ Script.Load("lua/ObstacleMixin.lua")
 Script.Load("lua/CommanderGlowMixin.lua")
 Script.Load("lua/ObjectiveInfo.lua")
 Script.Load("lua/SpawnBlockMixin.lua")
+Script.Load("lua/FilteredCinematicMixin.lua")
 
 class 'CommandStructure' (ScriptActor)
 CommandStructure.kMapName = "commandstructure"
@@ -62,7 +63,7 @@ function CommandStructure:OnCreate()
     InitMixin(self, ModelMixin)
     InitMixin(self, LiveMixin)
     InitMixin(self, GameEffectsMixin)
-    InitMixin(self, FlinchMixin)
+    InitMixin(self, FlinchMixin, { kPlayFlinchAnimations = true })
     InitMixin(self, TeamMixin)
     InitMixin(self, PointGiverMixin)
     InitMixin(self, AchievementGiverMixin)
@@ -79,6 +80,7 @@ function CommandStructure:OnCreate()
         InitMixin(self, SpawnBlockMixin)
     elseif Client then
         InitMixin(self, CommanderGlowMixin)
+        InitMixin(self, FilteredCinematicMixin)
     end
     
     self.occupied = false
@@ -88,6 +90,16 @@ function CommandStructure:OnCreate()
     self:SetPhysicsType(PhysicsType.Kinematic)
     self:SetPhysicsGroup(PhysicsGroup.BigStructuresGroup)
     
+    if Server then
+
+        self.lastDangerMusicTime = 0
+        self.dangerMusicActive = false
+        self:AddTimedCallback( CommandStructure.UpdateDangerMusicState , 0.5 )
+
+    end
+
+    self:SetUpdateRate(kRealTimeUpdateRate)
+
 end
 
 function CommandStructure:GetReceivesStructuralDamage()
@@ -109,7 +121,7 @@ if Client then
         if not self.helpArrows and visible then
         
             self.helpArrows = Client.CreateCinematic(RenderScene.Zone_Default)
-            self.helpArrows:SetCinematic(self:GetHelpArrowsCinematicName())
+            self.helpArrows:SetCinematic(FilterCinematicName(self:GetHelpArrowsCinematicName()))
             self.helpArrows:SetCoords(self:GetCoords())
             self.helpArrows:SetRepeatStyle(Cinematic.Repeat_Endless)
             
@@ -119,6 +131,12 @@ if Client then
             self.helpArrows:SetIsVisible(visible)
         end
         
+    end
+
+    function CommandStructure:OnFilteredCinematicOptionChanged()
+        if self.helpArrows then
+            self.helpArrows:SetCinematic(FilterCinematicName(self:GetHelpArrowsCinematicName()))
+        end
     end
     
     function CommandStructure:OnUpdateRender()
@@ -131,12 +149,12 @@ if Client then
             self.lastTimeOccupied = now
         end
         
-        local displayHelpArrows = Client.GetOptionInteger("hudmode", kHUDMode.Full) == kHUDMode.Full
+        local displayHelpArrows = Client.kHintsEnabled
         if player and displayHelpArrows then
         
-            // Display the help arrows (get into Comm structure) when the
-            // team does not have a commander and the Comm structure is built
-            // and some time has passed.
+            -- Display the help arrows (get into Comm structure) when the
+            -- team does not have a commander and the Comm structure is built
+            -- and some time has passed.
             displayHelpArrows = displayHelpArrows and player:GetTeamNumber() == self:GetTeamNumber()
             displayHelpArrows = displayHelpArrows and self:GetIsBuilt() and self:GetIsAlive()
             displayHelpArrows = displayHelpArrows and not ScoreboardUI_GetTeamHasCommander(self:GetTeamNumber())
@@ -170,11 +188,17 @@ function CommandStructure:OnUpdateAnimationInput(modelMixin)
     
 end
 
+function CommandStructure:GetCanBeUsed(player, useSuccessTable)
+    if not self:GetIsBuilt() then
+        useSuccessTable.useSuccess = false
+    end
+end
+
 function CommandStructure:GetCanBeUsedConstructed(byPlayer)
     return not ( byPlayer:isa("Exo") or GetTeamHasCommander(self:GetTeamNumber()))
 end
 
-// allow players to enter the hives before game start to signal that they want to command
+-- allow players to enter the hives before game start to signal that they want to command
 function CommandStructure:GetUseAllowedBeforeGameStart()
     return true
 end

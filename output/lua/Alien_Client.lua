@@ -1,10 +1,10 @@
-// ======= Copyright (c) 2003-2012, Unknown Worlds Entertainment, Inc. All rights reserved. =======
-//
-// lua\Alien_Client.lua
-//
-//    Created by:   Charlie Cleveland (charlie@unknownworlds.com)
-//
-// ========= For more information, visit us at http://www.unknownworlds.com =====================
+-- ======= Copyright (c) 2003-2012, Unknown Worlds Entertainment, Inc. All rights reserved. =======
+--
+-- lua\Alien_Client.lua
+--
+--    Created by:   Charlie Cleveland (charlie@unknownworlds.com)
+--
+-- ========= For more information, visit us at http:--www.unknownworlds.com =====================
 
 Script.Load("lua/MaterialUtility.lua")
 
@@ -94,7 +94,7 @@ function AlienUI_GetMovementSpecialCooldown()
 
 end
 
-// array of totalPower, minPower, xoff, yoff, visibility (boolean), hud slot
+-- array of totalPower, minPower, xoff, yoff, visibility (boolean), hud slot
 function GetActiveAbilityData(secondary)
 
     local data = { }
@@ -145,12 +145,11 @@ end
 
 function AlienUI_GetAvailableUpgrades()
 
-    
+    local techTree = localPlayer:GetTechTree()
 
     local upgrades = {}
     local localPlayer = Client.GetLocalPlayer()
-    local techTree = localPlayer:GetTechTree()
-    
+        
     if techTree and localPlayer then
 
         for _, upgradeId in ipairs(techTree:GetAddOnsForTechId(kTechId.AllAliens)) do
@@ -203,11 +202,11 @@ function AlienUI_GetEggCount()
     
 end
 
-/**
- * For current ability, return an array of
- * totalPower, minimumPower, tex x offset, tex y offset, 
- * visibility (boolean), command name
- */
+--
+-- For current ability, return an array of
+-- totalPower, minimumPower, tex x offset, tex y offset,
+-- visibility (boolean), command name
+--
 function PlayerUI_GetAbilityData()
 
     local data = {}
@@ -222,11 +221,11 @@ function PlayerUI_GetAbilityData()
     
 end
 
-/**
- * For secondary ability, return an array of
- * totalPower, minimumPower, tex x offset, tex y offset, 
- * visibility (boolean)
- */
+--
+-- For secondary ability, return an array of
+-- totalPower, minimumPower, tex x offset, tex y offset,
+-- visibility (boolean)
+--
 function PlayerUI_GetSecondaryAbilityData()
 
     local data = {}
@@ -241,15 +240,15 @@ function PlayerUI_GetSecondaryAbilityData()
     
 end
 
-/**
- * Return boolean value indicating if inactive powers should be visible
- */
+--
+-- Return boolean value indicating if inactive powers should be visible
+--
 function PlayerUI_GetInactiveVisible()
     local player = Client.GetLocalPlayer()
     return player:isa("Alien") and player:GetInactiveVisible()
 end
 
-// Loop through child weapons that aren't active and add all their data into one array
+-- Loop through child weapons that aren't active and add all their data into one array
 function PlayerUI_GetInactiveAbilities()
 
     local data = {}
@@ -260,14 +259,14 @@ function PlayerUI_GetInactiveAbilities()
     
         local inactiveAbilities = player:GetHUDOrderedWeaponList()
         
-        // Don't show selector if we only have one ability
-        if table.count(inactiveAbilities) > 1 then
+        -- Don't show selector if we only have one ability
+        if table.icount(inactiveAbilities) > 1 then
         
-            for index, ability in ipairs(inactiveAbilities) do
+            for _, ability in ipairs(inactiveAbilities) do
             
                 if ability:isa("Ability") then
                     local abilityData = ability:GetInterfaceData(false, true)
-                    if table.count(abilityData) > 0 then
+                    if table.icount(abilityData) > 0 then
                         table.addtable(abilityData, data)
                     end
                 end
@@ -302,48 +301,138 @@ function PlayerUI_GetPlayerMaxEnergy()
     
 end
 
-function PlayerUI_GetAdrenalineMaxEnergy()
-
-    local player = Client.GetLocalPlayer()
-    if player and player.GetAdrenalineMaxEnergy then
-        return player:GetAdrenalineMaxEnergy()
-    end
-    
-    return kAbilityMaxEnergy
-
-end
-
 function PlayerUI_GetHasMucousShield()
+    local result = false
 
     local player = Client.GetLocalPlayer()
-    if player and player.GetHasMucousShield then
-        return player:GetHasMucousShield()   
+    if player then
+        if player.GetHasMucousShield then
+            result = player:GetHasMucousShield()
+        end
+
+        if player.GetHasBabblerShield then
+            result = result or player:GetHasBabblerShield()
+        end
+
+        if HasMixin(player, "Shieldable") then
+            result = result or player:GetHasOverShield()
+        end
     end
-    return false
-    
+
+    return result
+
 end
 
 function PlayerUI_GetMucousShieldHP()
-
     local player = Client.GetLocalPlayer()
-    if player and player.GetMuscousShieldAmount then
-    
-        local health = math.ceil(player:GetMuscousShieldAmount())
-        return health
-        
+    if not player then return 0, 0 end
+
+    local health = 0
+    local maxHealth = 0
+
+    if player.GetMuscousShieldAmount then
+        health = math.ceil(player:GetMuscousShieldAmount())
+        if health > 0 then
+            maxHealth = player:GetMaxShieldAmount()
+        end
     end
-    
-    return 0
-    
+
+    if player.GetBabblerShieldAmount then
+        local shield = math.ceil(player:GetBabblerShieldAmount())
+        if shield > 0 then
+            health = health + shield
+            maxHealth = maxHealth + player:GetMaxBabblerShieldAmount()
+        end
+    end
+
+    if HasMixin(player, "Shieldable") then
+        local shield = math.ceil(player:GetOverShieldAmount())
+        if shield > 0 then
+            health = health + shield
+            maxHealth = maxHealth + player:GetMaxOverShieldAmount()
+        end
+    end
+
+    return health, maxHealth
 end
 
+function PlayerUI_GetMucousShieldFraction()
+    local health, maxHealth = PlayerUI_GetMucousShieldHP()
+
+    if maxHealth == 0 or health == 0 then return 0 end
+
+    return health / maxHealth
+end
+
+function PlayerUI_GetMucousShieldTimeRemaining()
+
+    local player = Client.GetLocalPlayer()
+    local fraction = 0
+
+    if player then
+        if player.GetShieldTimeRemaining then
+            fraction = math.max(player:GetShieldTimeRemaining(), fraction)
+        end
+
+        if HasMixin(player, "Shieldable") then
+            fraction = math.max(player:GetOverShieldTimeRemaining(), fraction)
+        end
+    end
+
+    return fraction
+
+end
+
+function PlayerUI_GetPlayerMucousShieldState()
+
+    local playerMucousShieldState = 1
+    if PlayerUI_GetHasMucousShield() then
+        playerMucousShieldState = 2
+    end
+
+    return playerMucousShieldState
+
+end
+
+function PlayerUI_GetIsOnFire()
+
+    local player = Client.GetLocalPlayer()
+    if player and player.GetIsOnFire then
+        return player:GetIsOnFire()
+    end
+
+    return false
+
+end
+
+function PlayerUI_GetIsElectrified()
+
+    local player = Client.GetLocalPlayer()
+    if player and player.GetElectrified then
+        return player:GetElectrified()
+    end
+
+    return false
+
+end
+
+function PlayerUI_GetIsWallWalking()
+
+    local player = Client.GetLocalPlayer()
+    if player and player:isa("Skulk") then
+        return player:GetIsWallWalking()
+    end
+
+    return false
+
+end
 function Alien:UpdateEnzymeEffect(isLocal)
 
     if self.enzymedClient ~= self.enzymed then
 
         if isLocal then
         
-            local viewModel= nil        
+            local viewModel       
             if self:GetViewModelEntity() then
                 viewModel = self:GetViewModelEntity():GetRenderModel()  
             end
@@ -383,7 +472,7 @@ function Alien:UpdateEnzymeEffect(isLocal)
         
     end
 
-    // update cinemtics
+    -- update cinemtics
     if self.enzymed then
 
         if not self.lastEnzymedEffect or self.lastEnzymedEffect + kEnzymeEffectInterval < Shared.GetTime() then
@@ -403,7 +492,7 @@ function Alien:UpdateMucousEffects(isLocal)
 
         if isLocal then
         
-            local viewModel= nil        
+            local viewModel        
             if self:GetViewModelEntity() then
                 viewModel = self:GetViewModelEntity():GetRenderModel()  
             end
@@ -443,7 +532,7 @@ function Alien:UpdateMucousEffects(isLocal)
         
     end
 
-    // update cinemtics
+    -- update cinemtics
     if self.mucousShield then
 
         if not self.lastMucousEffect or self.lastMucousEffect + kMucousEffectInterval < Shared.GetTime() then
@@ -478,7 +567,7 @@ function Alien:UpdateElectrified(isLocal)
 
         if isLocal then
         
-            local viewModel= nil        
+            local viewModel        
             if self:GetViewModelEntity() then
                 viewModel = self:GetViewModelEntity():GetRenderModel()  
             end
@@ -530,7 +619,7 @@ function Alien:UpdateClientEffects(deltaTime, isLocal)
 
     Player.UpdateClientEffects(self, deltaTime, isLocal)
     
-    // If we are dead, close the evolve menu.
+    -- If we are dead, close the evolve menu.
     if isLocal and not self:GetIsAlive() and self:GetBuyMenuIsDisplaying() then
         self:CloseMenu()
     end
@@ -543,7 +632,6 @@ function Alien:UpdateClientEffects(deltaTime, isLocal)
     
         local darkVisionFadeAmount = 1
         local darkVisionFadeTime = 0.2
-        local darkVisionPulseTime = 4
         local darkVisionState = self:GetDarkVisionEnabled()
 
         if self.lastDarkVisionState ~= darkVisionState then
@@ -576,6 +664,9 @@ function Alien:UpdateClientEffects(deltaTime, isLocal)
             useShader:SetParameter("startTime", self.darkVisionTime)
             useShader:SetParameter("time", Shared.GetTime())
             useShader:SetParameter("amount", darkVisionFadeAmount)
+            if (avType ~= nil) then
+                useShader:SetParameter("avType", avType)
+            end
             
         end
         
@@ -592,8 +683,9 @@ end
 function Alien:UpdateRegenerationEffect()
     
     local GUIRegenerationFeedback = ClientUI.GetScript("GUIRegenerationFeedback")
-    if GUIRegenerationFeedback and GetHasRegenerationUpgrade(self) and GUIRegenerationFeedback:GetIsAnimating() then
-    
+    if GUIRegenerationFeedback and GUIRegenerationFeedback:GetIsAnimating() and
+            GetHasRegenerationUpgrade(self) and self:GetShellLevel() > 0 then   
+
         if self.lastHealth then
         
             if self.lastHealth < self:GetHealth() then
@@ -618,7 +710,7 @@ function Alien:UpdateMisc(input)
     
     if not Shared.GetIsRunningPrediction() then
 
-        // Close the buy menu if it is visible when the Alien moves.
+        -- Close the buy menu if it is visible when the Alien moves.
         if input.move.x ~= 0 or input.move.z ~= 0 then
             self:CloseMenu()
         end
@@ -627,19 +719,21 @@ function Alien:UpdateMisc(input)
     
 end
 
-// Bring up evolve menu
+-- Bring up evolve menu
 function Alien:Buy()
 
-    // Don't allow display in the ready room, or as phantom
-    if self:GetIsLocalPlayer() then
+    -- Don't allow display in the ready room, or as phantom
+    -- Don't allow buy menu to be opened while help screen is displayed.
+    if self:GetIsLocalPlayer() and
+       not HelpScreen_GetHelpScreen():GetIsBeingDisplayed() and
+       not GetMainMenu():GetVisible() then
     
-        // The Embryo cannot use the buy menu in any case.
+        -- The Embryo cannot use the buy menu in any case.
         if self:GetTeamNumber() ~= 0 and not self:isa("Embryo") then
         
             if not self.buyMenu then
-            
+
                 self.buyMenu = GetGUIManager():CreateGUIScript("GUIAlienBuyMenu")
-                MouseTracker_SetIsVisible(true, "ui/Cursor_MenuDefault.dds", true)
                 
             else
                 self:CloseMenu()
@@ -723,35 +817,18 @@ function AlienUI_GetUpgradesForCategory(category)
         for _, upgradeId in ipairs(techTree:GetAddOnsForTechId(kTechId.AllAliens)) do
             
             if LookupTechData(upgradeId, kTechDataCategory, kTechId.None) == category then        
-          
                 table.insert(upgrades, upgradeId)
             end
             
         end
     
     end
-    
-    
-    
-    --if category == kTechId.ShadeHive then
-    --    table.insert(upgrades, kTechId.Phantom)
-    --    table.insert(upgrades, kTechId.Aura)
-    --end
-    
-    --if category == kTechId.ShiftHive then
-    --    table.insert(upgrades, kTechId.Adrenaline)
-    --    table.insert(upgrades, kTechId.Celerity)
-    --end
-    
-    --if category == kTechId.CragHive then
-    --    table.insert(upgrades, kTechId.Regeneration)
-    --    table.insert(upgrades, kTechId.Carapace)
-    --end
-    
+        
     return upgrades
+
 end
 
-// create some blood on the ground below
+-- create some blood on the ground below
 local kGroundDistanceBlood = Vector(0, 1, 0)
 local kGroundBloodStartOffset = Vector(0, 0.2, 0)
 function Alien:OnTakeDamageClient(damage, doer, position)
@@ -760,9 +837,9 @@ function Alien:OnTakeDamageClient(damage, doer, position)
         self.timeLastGroundBloodDecal = 0
     end
     
-    /*if self.timeLastGroundBloodDecal + 0.38 < Shared.GetTime() and doer then
+   --[[if self.timeLastGroundBloodDecal + 0.38 < Shared.GetTime() and doer then
         self:TriggerEffects("damage_sound_target_local", { doer = doer:GetClassName() })
-    end*/
+    end--]]
     
     if self.timeLastGroundBloodDecal + 0.5 < Shared.GetTime() then
     

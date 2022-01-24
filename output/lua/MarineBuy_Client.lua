@@ -1,13 +1,4 @@
-//=============================================================================
-//
-// lua/MarineBuy_Client.lua
-// 
-// Created by Henry Kropf and Charlie Cleveland
-// Copyright 2011, Unknown Worlds Entertainment
-//
-//=============================================================================
-
-local gWeaponDescription = nil
+local gWeaponDescription
 function MarineBuy_GetWeaponDescription(techId)
 
     if not gWeaponDescription then
@@ -19,18 +10,15 @@ function MarineBuy_GetWeaponDescription(techId)
         gWeaponDescription[kTechId.Shotgun] = "WEAPON_DESC_SHOTGUN"
         gWeaponDescription[kTechId.Flamethrower] = "WEAPON_DESC_FLAMETHROWER"
         gWeaponDescription[kTechId.GrenadeLauncher] = "WEAPON_DESC_GRENADELAUNCHER"
+        gWeaponDescription[kTechId.HeavyMachineGun] = "WEAPON_DESC_HMG"
         gWeaponDescription[kTechId.Welder] = "WEAPON_DESC_WELDER"
         gWeaponDescription[kTechId.LayMines] = "WEAPON_DESC_MINE"
         gWeaponDescription[kTechId.ClusterGrenade] = "WEAPON_DESC_CLUSTER_GRENADE"
         gWeaponDescription[kTechId.GasGrenade] = "WEAPON_DESC_GAS_GRENADE"
         gWeaponDescription[kTechId.PulseGrenade] = "WEAPON_DESC_PULSE_GRENADE"
         gWeaponDescription[kTechId.Jetpack] = "WEAPON_DESC_JETPACK"
-        gWeaponDescription[kTechId.Exosuit] = "WEAPON_DESC_EXO"
         gWeaponDescription[kTechId.DualMinigunExosuit] = "WEAPON_DESC_DUALMINIGUN_EXO"
-        gWeaponDescription[kTechId.UpgradeToDualMinigun] = "WEAPON_DESC_DUALMINIGUN_EXO"
-        gWeaponDescription[kTechId.ClawRailgunExosuit] = "WEAPON_DESC_CLAWRAILGUN_EXO"
-        gWeaponDescription[kTechId.DualRailgunExosuit] = "WEAPON_DESC_DUALRAILGUN_EXO"
-        gWeaponDescription[kTechId.UpgradeToDualRailgun] = "WEAPON_DESC_DUALRAILGUN_EXO"
+        gWeaponDescription[kTechId.DualRailgunExosuit] = "WEAPON_DESC_CLAWRAILGUN_EXO"
         
     end
     
@@ -38,17 +26,27 @@ function MarineBuy_GetWeaponDescription(techId)
     if not description then
         description = ""
     end
+
+    description = Locale.ResolveString(description)
+
+    local techTree = GetTechTree()
+    local requieres = techTree:GetRequiresText(techId)
+
+    if requieres ~= "" then
+        description = string.format(Locale.ResolveString("WEAPON_DESC_REQUIREMENTS"), requieres:lower(), description)
+    end
+
     
-    return Locale.ResolveString(description)
+    return description
     
 end
 
 function GetCurrentPrimaryWeaponTechId()
 
     local weapons = Client.GetLocalPlayer():GetHUDOrderedWeaponList()
-    if table.count(weapons) > 0 then
+    if table.icount(weapons) > 0 then
     
-        // Main weapon is our primary weapon - in the first slot
+        -- Main weapon is our primary weapon - in the first slot
         return weapons[1]:GetTechId()
         
     end
@@ -59,19 +57,19 @@ function GetCurrentPrimaryWeaponTechId()
 
 end
 
-/**
- * Get weapon id for current weapon (nebulously defined since there are 3 potentials?)
- */
+--
+-- Get weapon id for current weapon (nebulously defined since there are 3 potentials?)
+--
 function MarineBuy_GetCurrentWeapon()
     return TechIdToWeaponIndex(GetCurrentPrimaryWeaponTechId())
 end
 
-/**
- * Return information about the available weapons in a linear array
- * Name - string (for tooltips?)
- * normal tex x - int
- * normal tex y - int
- */
+--
+-- Return information about the available weapons in a linear array
+-- Name - string (for tooltips?)
+-- normal tex x - int
+-- normal tex y - int
+--
 function MarineBuy_GetEquippedWeapons()
 
     local t = {}
@@ -79,7 +77,7 @@ function MarineBuy_GetEquippedWeapons()
     local player = Client.GetLocalPlayer()
     local items = GetChildEntities(player, "ScriptActor")
 
-    for index, item in ipairs(items) do
+    for _, item in ipairs(items) do
     
         local techId = item:GetTechId()
         
@@ -100,12 +98,12 @@ function MarineBuy_GetEquippedWeapons()
     
 end
 
-/**
- * User pressed close button
- */
+--
+-- User pressed close button
+--
 function MarineBuy_Close()
 
-    // Close menu
+    -- Close menu
     local player = Client.GetLocalPlayer()
     if player then
         player:CloseMenu()
@@ -115,19 +113,19 @@ end
 
 local kMarineBuyMenuSounds = { Open = "sound/NS2.fev/common/open",
                               Close = "sound/NS2.fev/common/close",
-                              Purchase = "sound/ns2.fev/marine/common/comm_spend_metal",
+                              Purchase = "sound/NS2.fev/marine/common/comm_spend_metal",
                               SelectUpgrade = "sound/NS2.fev/common/button_press",
-                              SellUpgrade = "sound/ns2.fev/marine/common/comm_spend_metal",
+                              SellUpgrade = "sound/NS2.fev/marine/common/comm_spend_metal",
                               Hover = "sound/NS2.fev/common/hovar",
                               SelectWeapon = "sound/NS2.fev/common/hovar",
-                              SelectJetpack = "sound/ns2.fev/marine/common/pickup_jetpack",
-                              SelectExosuit = "sound/ns2.fev/marine/common/pickup_heavy" }
+                              SelectJetpack = "sound/NS2.fev/marine/common/pickup_jetpack",
+                              SelectExosuit = "sound/NS2.fev/marine/common/pickup_heavy" }
 
-for i, soundAsset in pairs(kMarineBuyMenuSounds) do
+for _, soundAsset in pairs(kMarineBuyMenuSounds) do
     Client.PrecacheLocalSound(soundAsset)
 end
 
-local gDisplayTechs = nil
+local gDisplayTechs
 local function GetDisplayTechId(techId)
 
     if not gDisplayTechs then
@@ -155,41 +153,29 @@ end
 
 function MarineBuy_GetEquipped()
 
-    local equipped = {}
+    local equipped = unique_set()
     
     local player = Client.GetLocalPlayer()
     local items = GetChildEntities(player, "ScriptActor")
 
-    for index, item in ipairs(items) do
+    for _, item in ipairs(items) do
     
         local techId = item:GetTechId()
         if GetDisplayTechId(techId) then
-            table.insertunique(equipped, techId)
+            equipped:Insert(techId)
         end
         
     end
     
     if player and player:isa("JetpackMarine") then
-        table.insertunique(equipped, kTechId.Jetpack)
-    end
-
-    if player and PlayerUI_GetArmorLevel() == 2 then
-        table.insertunique(equipped, kTechId.Armor2)
-    elseif player and PlayerUI_GetArmorLevel() == 3 then
-        table.insertunique(equipped, kTechId.Armor3)
-    end
+        equipped:Insert(kTechId.Jetpack)
+    end    
     
-
-    if player and player:GetWeaponLevel() == 2 then
-        table.insertunique(equipped, kTechId.Weapons2)    
-    elseif player and player:GetWeaponLevel() == 3 then
-        table.insertunique(equipped, kTechId.Weapons3)
-    end
-    return equipped
+    return equipped:GetList()
 
 end
 
-// called by GUIMarineBuyMenu
+-- called by GUIMarineBuyMenu
 
 function MarineBuy_IsResearched(techId)
 
@@ -202,62 +188,49 @@ function MarineBuy_IsResearched(techId)
     return true
 end
 
+local kGrenadeTechIds =
+{
+    kTechId.ClusterGrenade,
+    kTechId.GasGrenade,
+    kTechId.PulseGrenade,
+}
 
-local _playerInventoryCache = nil
+local _playerInventoryCache
 function MarineBuy_GetEquipment()
     
     local inventory = {}
     local player = Client.GetLocalPlayer()
     local items = GetChildEntities( player, "ScriptActor" )
     
-    for index, item in ipairs(items) do
+    for _, item in ipairs(items) do
     
         local techId = item:GetTechId()
-        
-        if techId ~= kTechId.Pistol and techId ~= kTechId.Axe and techId ~= kTechId.Rifle then
-        //can't buy above, so skip
-            
-            local itemName = GetDisplayNameForTechId(techId)    //simple validity check
-            if itemName then
-                inventory[techId] = true
+
+        local itemName = GetDisplayNameForTechId(techId)    --simple validity check
+        if itemName then
+            inventory[techId] = { Has = true, Occupied = false }
+        end
+
+        if MarineBuy_GetHasGrenades( techId ) then
+
+            for i = 1, #kGrenadeTechIds do
+
+                local grenadeTechId = kGrenadeTechIds[i]
+                if techId == grenadeTechId then
+                    inventory[grenadeTechId] = { Has = true, Occupied = false }
+                else
+                    inventory[grenadeTechId] = { Has = true, Occupied = true }
+                end
             end
-            
-            if MarineBuy_GetHasGrenades( techId ) then
-                inventory[kTechId.ClusterGrenade] = true
-                inventory[kTechId.GasGrenade] = true
-                inventory[kTechId.PulseGrenade] = true
-            end
-            
-            
+
         end
 
     end
     
-    
-    if PlayerUI_GetArmorLevel() == 2 then
-        inventory[kTechId.Armor2] = true
-        inventory[kTechId.Armor3] = true
-    end
-    
-    if PlayerUI_GetArmorLevel() == 3 then
-        inventory[kTechId.Armor2] = true
-        inventory[kTechId.Armor3] = true
-    end
-    
-    if PlayerUI_GetWeaponLevel() == 2 then
-        inventory[kTechId.Weapons2] = true
-        inventory[kTechId.Weapons3] = true
-    end
-    
-    if PlayerUI_GetWeaponLevel() == 3 then
-        inventory[kTechId.Weapons2] = true
-        inventory[kTechId.Weapons3] = true
-    end
-    
     if player:isa("JetpackMarine") then
-        inventory[kTechId.Jetpack] = true
-    //elseif player:isa("Exo") then
-        //Exo's are inheriently handled by how the BuyMenus are organized
+        inventory[kTechId.Jetpack] = { Has = true, Occupied = false }
+    --elseif player:isa("Exo") then
+        --Exo's are inherently handled by how the BuyMenus are organized
     end
     
     return inventory
@@ -292,7 +265,7 @@ function MarineBuy_GetHas( techId )
         return _playerInventoryCache[techId]
     end
     
-    return false
+    return { Has = false, Occupied = false }
     
 end
 
@@ -312,8 +285,9 @@ function MarineBuy_OnClose()
 end
 
 function MarineBuy_OnPurchase()
-    StartSoundEffect(kMarineBuyMenuSounds.Puchase)
+    StartSoundEffect(kMarineBuyMenuSounds.Purchase)
 end
+
 
 function MarineBuy_OnUpgradeSelected()
     StartSoundEffect(kMarineBuyMenuSounds.SelectUpgrade)    
@@ -323,10 +297,10 @@ function MarineBuy_OnUpgradeDeselected()
     StartSoundEffect(kMarineBuyMenuSounds.SellUpgrade)    
 end
 
-// special sounds for jetpack etc.
+-- special sounds for jetpack etc.
 function MarineBuy_OnItemSelect(techId)
 
-    if techId == kTechId.Axe or techId == kTechId.Rifle or techId == kTechId.Shotgun or techId == kTechId.GrenadeLauncher or 
+    if techId == kTechId.Axe or techId == kTechId.Rifle or techId == kTechId.Shotgun or techId == kTechId.HeavyMachineGun or techId == kTechId.GrenadeLauncher or
        techId == kTechId.Flamethrower or techId == kTechId.Welder or techId == kTechId.LayMines then
        
         StartSoundEffect(kMarineBuyMenuSounds.SelectWeapon)
@@ -343,9 +317,9 @@ function MarineBuy_OnItemSelect(techId)
 
 end
 
-/**
- * User pressed close button
- */
+--
+-- User pressed close button
+--
 function MarineBuy_CloseNonFlash()
     local player = Client.GetLocalPlayer()
     player:CloseMenu()
@@ -374,13 +348,13 @@ end
 function MarineBuy_GetResearchProgress(techId)
 
     local techTree = GetTechTree()
-    local techNode = nil
+    local techNode
     
     if techTree ~= nil then
         techNode = techTree:GetTechNode(techId)
     end
     
-    if techNode  ~= nil then
+    if techNode ~= nil then
         return techNode:GetPrereqResearchProgress()
     end
     

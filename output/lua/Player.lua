@@ -22,7 +22,6 @@ Script.Load("lua/DoorMixin.lua")
 Script.Load("lua/Mixins/ControllerMixin.lua")
 Script.Load("lua/LiveMixin.lua")
 Script.Load("lua/AchievementReceiverMixin.lua")
-
 Script.Load("lua/AchievementGiverMixin.lua")
 Script.Load("lua/UpgradableMixin.lua")
 Script.Load("lua/PointGiverMixin.lua")
@@ -35,6 +34,8 @@ Script.Load("lua/EntityChangeMixin.lua")
 Script.Load("lua/UnitStatusMixin.lua")
 Script.Load("lua/AFKMixin.lua")
 Script.Load("lua/SmoothedRelevancyMixin.lua")
+Script.Load("lua/ClientLOSMixin.lua")
+Script.Load("lua/menu2/PlayerScreen/CallingCards/GUIMenuCallingCardData.lua") -- kCallingCards enum
 
 if Client then
     Script.Load("lua/HelpMixin.lua")
@@ -53,7 +54,7 @@ Player.kHintInterval = 18
 Player.kPushDuration = 0.5
 Player.kAllFreeCheat = false
 
-// min/max distance for physics culling
+-- min/max distance for physics culling
 Player.kPhysicsCullMin = 3
 Player.kPhysicsCullMax = 50
 
@@ -215,35 +216,32 @@ Player.kMaxStepAmount = 2
  ]]
 local networkVars =
 {
-    // the player need to track its own origin at full precision in order for its 
-    
-    // own movement and actions to be fluid and predictable
-    fullPrecisionOrigin = "private vector", 
-    
+    -- the player need to track its own origin at full precision in order for its
+    -- own movement and actions to be fluid and predictable
+    fullPrecisionOrigin = "private compensated vector",
+
     clientIndex = "entityid",
-    
+
     viewModelId = "private entityid",
-    
+
     resources = "private float (0 to " .. kMaxPersonalResources .." by 0.01)",
-    teamResources = "private float (0 to " .. kMaxTeamResources .." by 0.01)",
-    gameStarted = "private boolean",
-    gameBuytime = "private boolean",
-    countingDown = "private boolean",
+    teamResources = "private float (0 to " .. kMaxTeamResources .." by 0.01)", -- Todo: Remove and use TeamInfoEntity field
+
     frozen = "private boolean",
-    
-    timeOfLastUse = "private time",
-    
+
+    timeOfLastUse = "private compensated time",
+
     --bodyYaw must be compensated as it feeds into the animation as a pose parameter
     bodyYaw = "compensated interpolated float (-3.14159265 to 3.14159265 by 0.003)",
-    standingBodyYaw = "interpolated float (0 to 6.2831853 by 0.003)",
-    
+    standingBodyYaw = "compensated interpolated float (0 to 6.2831853 by 0.003)",
+
     bodyYawRun = "compensated interpolated float (-3.14159265 to 3.14159265 by 0.003)",
-    runningBodyYaw = "interpolated float (0 to 6.2831853 by 0.003)",
+    runningBodyYaw = "compensated interpolated float (0 to 6.2831853 by 0.003)",
     timeLastMenu = "private time",
     darwinMode = "private boolean",
-    
+
     moveButtonPressed = "compensated boolean",
-    
+
     --[[
         Player-specific mode. When set to kPlayerMode.Default, player moves and acts normally, otherwise
         he doesn't take player input. Change mode and set modeTime to the game time that the mode
@@ -251,26 +249,27 @@ local networkVars =
         that mode change, otherwise it will go back to kPlayerMode.Default. Used for things like taunting,
         building structures and other player actions that take time while the player is stationary.
      ]]
-    mode = "private enum kPlayerMode",
-    
+    mode = "private compensated enum kPlayerMode",
+
     -- Time when mode will end. Set to -1 to have it never end.
-    modeTime = "private float",
-    
-    primaryAttackLastFrame = "boolean",
-    secondaryAttackLastFrame = "boolean",
-    
+    modeTime = "private compensated float",
+
+    primaryAttackLastFrame = "compensated boolean",
+    secondaryAttackLastFrame = "compensated boolean",
+    tertiaryAttackLastFrame = "compensated boolean",
+
     isUsing = "boolean",
-    
+
     -- Reduce max player velocity in some cases (marine jumping)
-    slowAmount = "float (0 to 1 by 0.01)",
-    
+    slowAmount = "compensated float (0 to 1 by 0.01)",
+
     giveDamageTime = "private time",
-    
+
     pushImpulse = "private vector",
     pushTime = "private time",
-    
+
     isMoveBlocked = "private boolean",
-    
+
     communicationStatus = "enum kPlayerCommunicationStatus",
 
 }
@@ -289,6 +288,7 @@ AddMixinNetworkVars(UpgradableMixin, networkVars)
 AddMixinNetworkVars(GameEffectsMixin, networkVars)
 AddMixinNetworkVars(FlinchMixin, networkVars)
 AddMixinNetworkVars(TeamMixin, networkVars)
+AddMixinNetworkVars(ClientLOSMixin, networkVars)
 
 local function GetTabDirectionVector(buttonReleased)
 
@@ -303,7 +303,7 @@ end
 function Player:OnCreate()
 
     ScriptActor.OnCreate(self)
-    
+
     InitMixin(self, BaseModelMixin)
     InitMixin(self, ModelMixin)
     InitMixin(self, ControllerMixin)
@@ -312,11 +312,10 @@ function Player:OnCreate()
     -- TODO: move LiveMixin to child classes (some day)
     InitMixin(self, LiveMixin)
     InitMixin(self, AchievementReceiverMixin)
-
     InitMixin(self, AchievementGiverMixin)
     InitMixin(self, UpgradableMixin)
     InitMixin(self, GameEffectsMixin)
-    InitMixin(self, FlinchMixin)
+    InitMixin(self, FlinchMixin, { kPlayFlinchAnimations = false }) --Disable flinch animations due to hitreg desync issue on animation blending between Client/Server
     InitMixin(self, TeamMixin)
     InitMixin(self, PointGiverMixin)
     InitMixin(self, EntityChangeMixin)
@@ -324,12 +323,13 @@ function Player:OnCreate()
 
     if Client then
         InitMixin(self, HelpMixin)
+        InitMixin(self, ClientLOSMixin)
         self:AddFieldWatcher("locationId", Player.OnLocationIdChange)
     end
 
     self:SetLagCompensated(true)
-    
-    self:SetUpdates(true)
+
+    self:SetUpdates(true, kRealTimeUpdateRate)
     
     if Server then
     
@@ -339,9 +339,13 @@ function Player:OnCreate()
         self.giveDamageTime = 0
         self.sendTechTreeBase = false
         self.waitingForAutoTeamBalance = false
-        
+
+    elseif Client then
+
+        self.giveDamageTimeClientCheck = 0
+
     end
-    
+           
     self.viewOffset = Vector(0, 0, 0)
     
     self.bodyYaw = 0
@@ -360,6 +364,7 @@ function Player:OnCreate()
     self.modeTime = -1
     self.primaryAttackLastFrame = false
     self.secondaryAttackLastFrame = false
+    self.tertiaryAttackLastFrame = false
     
     self.requestsScores = false
     self.viewModelId = Entity.invalidId
@@ -388,6 +393,9 @@ function Player:OnCreate()
     
     self.pushImpulse = Vector(0, 0, 0)
     self.pushTime = 0
+
+    self.concedeSettingsIndex = 1
+    self.callingCard = kDefaultPlayerCallingCard
     
 end
 
@@ -416,11 +424,11 @@ function Player:UpdateTechTree()
 
     PROFILE("Player:UpdateTechTree")
     
-    // Compute tech tree availability only so often because it's very slooow
+    -- Compute tech tree availability only so often because it's very slooow
     if self.techTree and (self.timeOfLastTechTreeUpdate == nil or Shared.GetTime() > self.timeOfLastTechTreeUpdate + PlayingTeam.kTechTreeUpdateTime) then
         
 
-        // Send tech tree base line to players that just switched teams or joined the game        
+        -- Send tech tree base line to players that just switched teams or joined the game        
         local player = self
         
         
@@ -429,7 +437,7 @@ function Player:UpdateTechTree()
                         
         self.techTree:SendTechTreeUpdates(player)
                
-        // Send research, availability, etc. tech node updates to team players
+        -- Send research, availability, etc. tech node updates to team players
         
         self.timeOfLastTechTreeUpdate = Shared.GetTime()
         
@@ -454,7 +462,7 @@ function Player:OnInitialized()
         end
         
 
-        //self:InitTechTree()
+        --self:InitTechTree()
         
         
         self:SetName(kDefaultPlayerName)
@@ -484,10 +492,30 @@ function Player:OnInitialized()
         if not self:GetIsLocalPlayer() and not self:isa("Commander") and not self:isa("Spectator") then
             InitMixin(self, UnitStatusMixin)
         end
-        
+
+        local serverBlood = GetAdvancedOption("serverblood")
+        local message =
+        {
+            serverBlood = serverBlood
+        }
+        Client.SendNetworkMessage("ServerConfirmedHitEffects", message, true)
+
+        self.serverBlood = serverBlood
+
+        Player.kTracersEnabled = GetAdvancedOption("tracers")
+
+        Client.SendNetworkMessage("SetAlienWeaponUseHUDSlot",
+        {
+            slotMode = GetAdvancedOption("alien_weaponslots")
+        }, true)
+
+        Client.SendNetworkMessage("InitAVState",
+        {
+            startsOn = GetAdvancedOption("avstate")
+        }, true)      
     end
     
-    // TODO: MOVE TO ONCREATE
+    -- TODO: MOVE TO ONCREATE
     self.communicationStatus = kPlayerCommunicationStatus.None
     
 end
@@ -526,14 +554,7 @@ function Player:OnDestroy()
         self:UpdateDisorientSoundLoop(false)
         
         self:CloseMenu()
-        
-        if self.guiCountDownDisplay then
-        
-            GetGUIManager():DestroyGUIScript(self.guiCountDownDisplay)
-            self.guiCountDownDisplay = nil
-            
-        end
-        
+              
         if self.unitStatusDisplay then
         
             GetGUIManager():DestroyGUIScriptSingle("GUIUnitStatus")
@@ -549,6 +570,13 @@ function Player:OnDestroy()
             DestroyEntity(self.playerInfo)
             self.playerInfo = nil
             
+        end
+
+        if self:GetIsVirtual() then
+            local bot = self:GetControllingBot()
+            if bot then
+                bot:OnDestroy()
+            end
         end
         
     end
@@ -632,6 +660,7 @@ end
 function Player:GetViewOffset()
     return self.viewOffset
 end
+
 
 --[[
     Stores the player's current view offset. Calculated from GetMaxViewOffset() and crouch state.
@@ -719,6 +748,10 @@ function Player:SecondaryAttack()
 
 end
 
+function Player:TertiaryAttack()
+
+end
+
 function Player:PrimaryAttackEnd()
 
     local weapon = self:GetActiveWeapon()
@@ -735,6 +768,10 @@ function Player:SecondaryAttackEnd()
         weapon:OnSecondaryAttackEnd(self)
     end
     
+end
+
+function Player:TertiaryAttackEnd()
+
 end
 
 function Player:SelectNextWeapon()
@@ -795,84 +832,118 @@ function Player:PerformUseTrace()
 
     local startPoint = self:GetEyePos()
     local viewCoords = self:GetViewAngles():GetCoords()
-    
+
     -- To make building low objects like an infantry portal easier, increase the use range
     -- as we look downwards. This effectively makes use trace in a box shape when looking down.
+    local isUsing = self:GetIsUsing()
+    local useAngle = -0.5
+    local useBoxSize1 = Vector(0.2, 0.2, 0.2)
+    local useBoxSize2 = kUseBoxSize
+    local maxUseLength = (useBoxSize2 - -useBoxSize2):GetLength()
+
     local useRange = kPlayerUseRange
     local sinAngle = viewCoords.zAxis:GetLengthXZ()
     if viewCoords.zAxis.y < 0 and sinAngle > 0 then
-    
+
         useRange = kPlayerUseRange / sinAngle
         if -viewCoords.zAxis.y * useRange > kDownwardUseRange then
             useRange = kDownwardUseRange / -viewCoords.zAxis.y
         end
-        
+
     end
-    
+
+    -----------------
+    -- Artifially increase the range if we are actually building, so we get 2 completly different thresholds
+    -- for starting to 'use', and stopping it. Those removing the glitch in/out/in/out effect near edge values.
+
+    -- VAR   = VAR      * (isUsing and FORGIVING_VALUE or DEFAULT_VALUE)
+    -- useRange = useRange + (isUsing and 1.00 or 0)
+
+    -- useAngle = useAngle * (isUsing and -0.60 or -0.50)
+    -- useBoxSize1 = useBoxSize1 * (isUsing and 2.00 or 1.00)
+    -- useBoxSize2 = useBoxSize2 * (isUsing and 2.00 or 1.00)
+    -- maxUseLength = maxUseLength + (isUsing and 0.50 or 0)
+
+    -----------------
+
     -- Get possible useable entities within useRange that have an attach point.
     local ents = GetEntitiesWithMixinWithinRange("Usable", self:GetOrigin(), useRange)
     for e = 1, #ents do
-    
+
         local entity = ents[e]
         -- Filter away anything on the enemy team. Allow using entities not on any team.
         if not HasMixin(entity, "Team") or self:GetTeamNumber() == entity:GetTeamNumber() then
-        
+
             local usablePoints = entity:GetUsablePoints()
             if usablePoints then
-            
+
                 for p = 1, #usablePoints do
-                
+
                     local usablePoint = usablePoints[p]
                     local success = GetIsValidUseOfPoint(self, entity, usablePoint, useRange)
                     if success then
                         return entity, usablePoint
                     end
-                    
+
                 end
-                
+
             end
-            
+
         end
-        
+
     end
-    
+
     -- If failed, do a regular trace with entities that don't have usable points.
     local viewCoords = self:GetViewAngles():GetCoords()
-    local endPoint = startPoint + viewCoords.zAxis * useRange
-    local activeWeapon = self:GetActiveWeapon()
-    
-    local trace = Shared.TraceRay(startPoint, endPoint, CollisionRep.Default, PhysicsMask.AllButPCs, EntityFilterTwo(self, activeWeapon))  
-    
+    local endPoint = startPoint + viewCoords.zAxis * kMaxRelevancyDistance
+
+    local trace = Shared.TraceRay(startPoint, endPoint, CollisionRep.Damage, PhysicsMask.AllButPCsAndRagdollsAndBabblers, EntityFilterOneAndIsa(self, "Weapon"))
+
+    if isUsing and trace.entity == nil then
+        trace = Shared.TraceBox(useBoxSize1, startPoint, endPoint, CollisionRep.Damage, PhysicsMask.AllButPCsAndRagdollsAndBabblers, EntityFilterOneAndIsa(self, "Weapon"))
+    end
+
     if trace.fraction < 1 and trace.entity ~= nil then
-    
+
+        local distToEnt = trace.endPoint:GetDistanceTo(startPoint)
+        local maxDistToUse = trace.entity.GetUseMaxRange and trace.entity:GetUseMaxRange() or useRange
         -- Only return this entity if it can be used and it does not have a usable point (which should have been
         -- caught in the above cases).
-        if GetCanEntityBeUsedWithNoUsablePoint(self, trace.entity) then
+        if distToEnt <= maxDistToUse and GetCanEntityBeUsedWithNoUsablePoint(self, trace.entity) then
             return trace.entity, trace.endPoint
+            -- else
+            --     Log("First traceBox error (%s / %s", tostring(distToEnt <= maxDistToUse), trace.entity)
         end
-        
+        -- else
+        --     Log("No entity or fraction touched a wall: %s / %s", tostring(trace.fraction), trace.entity)
     end
-    
-    -- Called in case the normal trace fails to allow some tolerance.
-    -- Modify the endPoint to account for the size of the box.
-    local maxUseLength = (kUseBoxSize - -kUseBoxSize):GetLength()
-    endPoint = startPoint + viewCoords.zAxis * (useRange - maxUseLength / 2)
-    local traceBox = Shared.TraceBox(kUseBoxSize, startPoint, endPoint, CollisionRep.Move, PhysicsMask.AllButPCs, EntityFilterTwo(self, activeWeapon))
-    -- Only return this entity if it can be used and it does not have a usable point (which should have been caught in the above cases).
-    if traceBox.fraction < 1 and traceBox.entity ~= nil and GetCanEntityBeUsedWithNoUsablePoint(self, traceBox.entity) then
-    
-        local direction = startPoint - traceBox.entity:GetOrigin()
-        direction:Normalize()
-        
-        -- Must be generally facing the entity.
-        if viewCoords.zAxis:DotProduct(direction) < -0.5 then
-            return traceBox.entity, traceBox.endPoint
+
+
+    if isUsing then
+        -- Called in case the normal trace fails to allow some tolerance.
+        -- Modify the endPoint to account for the size of the box.
+        endPoint = startPoint + viewCoords.zAxis * (useRange - maxUseLength / 2)
+        local traceBox = Shared.TraceBox(useBoxSize2, startPoint, endPoint, CollisionRep.Move, PhysicsMask.AllButPCsAndRagdollsAndBabblers, EntityFilterOneAndIsa(self, "Weapon"))
+        -- Only return this entity if it can be used and it does not have a usable point (which should have been caught in the above cases).
+        if traceBox.fraction < 1 and traceBox.entity ~= nil and GetCanEntityBeUsedWithNoUsablePoint(self, traceBox.entity) then
+
+            local direction = startPoint - traceBox.entity:GetOrigin()
+            direction:Normalize()
+
+            -- Must be generally facing the entity.
+            if viewCoords.zAxis:DotProduct(direction) < useAngle then
+                return traceBox.entity, traceBox.endPoint
+                -- else
+                --     Log("View angle too bad; %s < %s", tostring(viewCoords.zAxis:DotProduct(direction)), tostring(useAngle))
+            end
+
         end
-        
     end
-    
+
+    -- Log("None of the trace matched")
+
     return nil, Vector(0, 0, 0)
-    
+
 end
 
 function Player:UseTarget(entity, timePassed)
@@ -900,22 +971,17 @@ end
 local function AttemptToUse(self, timePassed)
 
     PROFILE("Player:AttemptToUse")
-    
+
     assert(timePassed >= 0)
-    
-    if (Shared.GetTime() - self.timeOfLastUse) < kUseInterval then
-        return false
-    end
-    
+
     -- Cannot use anything unless playing the game (a non-spectating player).
-    if not self:GetIsOnPlayingTeam() then
+    if
+    Shared.GetTime() - self.timeOfLastUse < kUseInterval
+            or self:isa("Spectator")
+    then
         return false
     end
-    
-    if GetIsVortexed(self) then
-        return false
-    end
-    
+
     -- Trace to find use entity.
     local entity, usablePoint = self:PerformUseTrace()
     
@@ -925,6 +991,11 @@ local function AttemptToUse(self, timePassed)
         -- if the game isn't started yet, check if the entity is usuable in non-started game
         -- (allows players to select commanders before the game has started)
         if not self:GetGameStarted() and not (entity.GetUseAllowedBeforeGameStart and entity:GetUseAllowedBeforeGameStart()) then
+            return false
+        end
+
+        -- Special check for warmup mode
+        if entity.GetCanBeUsedDuringWarmup and GetWarmupActive() and not entity:GetCanBeUsedDuringWarmup() then
             return false
         end
         
@@ -982,11 +1053,15 @@ end
     Returns true if the player is currently on a team and the game has started.
 ]]
 function Player:GetIsPlaying()
-    return self.gameStarted and self:GetIsOnPlayingTeam()
+    return self:GetGameStarted() and self:GetIsOnPlayingTeam()
 end
 
 function Player:GetIsOnPlayingTeam()
     return self:GetTeamNumber() == kTeam1Index or self:GetTeamNumber() == kTeam2Index
+end
+
+function Player:GetTechAllowed(techId, techNode)
+    return ScriptActor.GetTechAllowed(self, techId, techNode, self)
 end
 
 local function HasTeamAssigned(self)
@@ -1073,6 +1148,7 @@ function Player:GetClampedMaxSpeed()
     return 30
 end
 
+
 function Player:GetPerformsVerticalMove()
     return false
 end
@@ -1139,18 +1215,22 @@ end
 function Player:AdjustMove(input)
 
     PROFILE("Player:AdjustMove")
-    
+
+    ConcedeSequence.ModifyPlayerMove(self, input)
+
     -- Don't allow movement when frozen in place
-    if self.frozen then
-        input.move:Scale(0)
-    else        
-    
-        -- Allow child classes to affect how much input is allowed at any time
-        if self.mode == kPlayerMode.Taunt then
-            input.move:Scale(Player.kTauntMovementScalar)
-        end
-        
+    --McG: Remove as frozen state can get out of sync depending on when players join a team
+    --the desired effect of frozen flag is already dealt with in Player:OnProcessMove() anyways, this is pointless.
+    --if self.frozen then
+    --    input.move:Scale(0)
+    --else
+
+    -- Allow child classes to affect how much input is allowed at any time
+    if self.mode == kPlayerMode.Taunt then
+        input.move:Scale(Player.kTauntMovementScalar)
     end
+
+    --end
     
     return input
     
@@ -1240,6 +1320,10 @@ function Player:UpdateViewAngles(input)
 
     PROFILE("Player:UpdateViewAngles")
 
+    if ConcedeSequence.GetIsPlayerObserving(self) then
+        return
+    end
+
     -- Update to the current view angles.    
     local viewAngles = Angles(input.pitch, input.yaw, 0)
     self:SetViewAngles(viewAngles)
@@ -1291,6 +1375,10 @@ function Player:GetIsUsingBodyYaw()
     return true
 end
 
+function Player:GetBodyYawTurnThreshold()
+    return -kBodyYawTurnThreshold, kBodyYawTurnThreshold
+end
+
 local function UpdateBodyYaw(self, deltaTime, tempInput)
 
     if self:GetIsUsingBodyYaw() then
@@ -1302,26 +1390,28 @@ local function UpdateBodyYaw(self, deltaTime, tempInput)
             -- Take a bit of time to reset value so going into the move animation doesn't skip.
             self.standingBodyYaw = SlerpRadians(self.standingBodyYaw, yaw, deltaTime * kTurnMoveYawBlendToMovingSpeed)
             self.standingBodyYaw = Math.Wrap(self.standingBodyYaw, 0, kDoublePI)
-            
+
             self.runningBodyYaw = SlerpRadians(self.runningBodyYaw, yaw, deltaTime * kTurnRunDelaySpeed)
             self.runningBodyYaw = Math.Wrap(self.runningBodyYaw, 0, kDoublePI)
-            
+
         else
             self.runningBodyYaw = yaw
-            
+
+            local bodyYawTurnThresholdLeft,bodyYawTurnThresholdRight = self:GetBodyYawTurnThreshold()
             local diff = RadianDiff(self.standingBodyYaw, yaw)
-            if math.abs(diff) >= kBodyYawTurnThreshold then
-            
-                diff = Clamp(diff, -kBodyYawTurnThreshold, kBodyYawTurnThreshold)
+
+            if diff < bodyYawTurnThresholdLeft or bodyYawTurnThresholdRight < diff then
+
+                diff = Clamp(diff, bodyYawTurnThresholdLeft, bodyYawTurnThresholdRight)
                 self.standingBodyYaw = Math.Wrap(diff + yaw, 0, kDoublePI)
-                
+
             end
-            
+
         end
-        
+
         self.bodyYawRun = Clamp(RadianDiff(self.runningBodyYaw, yaw), -kHalfPI, kHalfPI)
         self.runningBodyYaw = Math.Wrap(self.bodyYawRun + yaw, 0, kDoublePI)
-        
+
         local adjustedBodyYaw = RadianDiff(self.standingBodyYaw, yaw)
         if adjustedBodyYaw >= 0 then
             self.bodyYaw = adjustedBodyYaw % kHalfPI
@@ -1338,7 +1428,7 @@ local function UpdateBodyYaw(self, deltaTime, tempInput)
         self.bodyYawRun = 0
 
     end
-    
+
 end
 local function UpdateAnimationInputs(self, input)
 
@@ -1358,13 +1448,20 @@ local function UpdateAnimationInputs(self, input)
 end
 
 function Player:ConfigurePhysicsCuller()
-    local viewCoords = self:GetViewCoords()
-    local viewPoint = self:GetOrigin()
+
+    if GetConcedeSequenceActive() then
+        return
+    end
+
+    local viewCoords = self:GetCameraViewCoords()
+    local viewPoint = viewCoords.origin
+    local viewAngles = Angles()
+    viewAngles:BuildFromCoords(viewCoords)
     local fovDegrees = Math.Degrees(GetScreenAdjustedFov(Client.GetEffectiveFov(self), 4/3))
-    // turn off physics culling (maxDist== 0) for overhead view; FOV is not necessarily correct and maxdist can be quite long
     local maxDistOrOff = PlayerUI_IsOverhead() and 0 or Player.kPhysicsCullMax
-        
-    Client.ConfigurePhysicsCuller(viewPoint, self:GetViewAngles(), fovDegrees, Player.kPhysicsCullMin, maxDistOrOff)
+
+    Client.ConfigurePhysicsCuller(viewPoint, viewAngles, fovDegrees, Player.kPhysicsCullMin, maxDistOrOff)
+
 end
 
 function Player:OnProcessIntermediate(input)
@@ -1422,7 +1519,8 @@ end
 -- compensated fields are rolled back in time, so it needs to restore them once the processing
 -- is done. So it backs up, synchs to the old state, runs the OnProcessMove(), then restores them. 
 function Player:OnProcessMove(input)
-    // ensure that a player is always moving itself using full precision
+
+    -- ensure that a player is always moving itself using full precision
     self:SetOrigin(self.fullPrecisionOrigin)
     -- Log("%s: TrackVel-0-start : vel=%s", self, self.velocity)
     -- Log("%s: TrackYaw-0-input: input.yaw=%s|input.pitch=%s", self, input.yaw, input.pitch)
@@ -1435,7 +1533,7 @@ function Player:OnProcessMove(input)
     local commands = input.commands
     if self:GetIsAlive() then
     
-        if self.countingDown then
+        if self:GetCountdownActive() then
         
             input.move:Scale(0)
             input.commands = 0
@@ -1454,7 +1552,7 @@ function Player:OnProcessMove(input)
         
     end
     
-    if true then
+    do
         PROFILE("Player:OnProcessMove:OnUpdatePlayer")
         self:OnUpdatePlayer(input.time)
     end
@@ -1506,8 +1604,8 @@ function Player:OnProcessMove(input)
         self:ConfigurePhysicsCuller()
     end
     
-    // for debugging hitreg; if hitreg scan is enabled, we generate a hitreg scan every move
-    // very spammy and wasteful of network resources
+    -- for debugging hitreg; if hitreg scan is enabled, we generate a hitreg scan every move
+    -- very spammy and wasteful of network resources
     if self.hitregDebugAlways then
         local viewAxis = self:GetViewAngles():GetCoords().zAxis
         local startPoint = self:GetEyePos()
@@ -1559,7 +1657,7 @@ function Player:OnUpdate(deltaTime)
         self:OnUpdatePlayer(deltaTime)
     end
     
-    //self:UpdateTechTree()
+    --self:UpdateTechTree()
 
 end
 
@@ -1691,6 +1789,8 @@ function Player:GetHeadAngles()
 end
 
 function Player:OnUpdatePoseParameters()
+
+    PROFILE("Player:OnUpdatePoseParameters")
     
     if not Shared.GetIsRunningPrediction() then
         
@@ -1825,7 +1925,7 @@ function Player:HandleAttacks(input)
     PROFILE("Player:HandleAttacks")
 
     if not self:GetCanAttack() then
-        return
+        input.commands = bit.band(input.commands, bit.bnot(bit.bor(Move.PrimaryAttack, Move.SecondaryAttack, Move.TertiaryAttack)))
     end
     
     self:WeaponUpdate()
@@ -1859,10 +1959,25 @@ function Player:HandleAttacks(input)
         
     end
 
+    if (bit.band(input.commands, Move.TertiaryAttack) ~= 0) then
+
+        self:TertiaryAttack()
+
+    else
+
+        if(self.tertiaryAttackLastFrame ~= nil and self.tertiaryAttackLastFrame) then
+
+            self:TertiaryAttackEnd()
+
+        end
+
+    end
+
     -- Remember if we attacked so we don't call AttackEnd() until mouse button is released
     self.primaryAttackLastFrame = (bit.band(input.commands, Move.PrimaryAttack) ~= 0)
     self.secondaryAttackLastFrame = (bit.band(input.commands, Move.SecondaryAttack) ~= 0)
-    
+    self.tertiaryAttackLastFrame = (bit.band(input.commands, Move.TertiaryAttack) ~= 0)  
+
 end
 
 function Player:HandleDoubleTap(input)
@@ -1955,11 +2070,14 @@ function Player:HandleButtons(input)
                                                                    Move.SelectNextWeapon, Move.SelectPrevWeapon, Move.Reload,
                                                                    Move.Taunt, Move.Weapon1, Move.Weapon2,
                                                                    Move.Weapon3, Move.Weapon4, Move.Weapon5, 
-                                                                   Move.Crouch, Move.Drop, Move.MovementModifier)))
+                                                                   Move.Crouch, Move.Drop, Move.MovementModifier,
+                                                                   Move.TertiaryAttack, Move.QuickSwitch)))
                                                                    
         input.move.x = 0
         input.move.y = 0
         input.move.z = 0
+
+        self:HandleAttacks(input) -- so that attacks will properly end.
                                                                    
         return
         
@@ -2055,19 +2173,19 @@ function Player:HandleButtons(input)
     
 end
 
-function Player:OnWeldOverride(doer, elapsedTime)
+function Player:OnWeldOverride(doer, elapsedTime, weldPerSecOverride)
 
     -- macs weld marines by only 50% of the rate
-    local macMod = (HasMixin(self, "Combat") and self:GetIsInCombat()) and 0.1 or 0.5    
+    local macMod = (HasMixin(self, "Combat") and self:GetIsInCombat()) and 0.1 or 0.5
     local weldMod = ( doer ~= nil and doer:isa("MAC") ) and macMod or 1
 
     if self:GetArmor() < self:GetMaxArmor() then
-    
-        local addArmor = kPlayerArmorWeldRate * elapsedTime * weldMod
+
+        local addArmor = (weldPerSecOverride or kPlayerArmorWeldRate) * elapsedTime * weldMod
         self:SetArmor(self:GetArmor() + addArmor)
-        
+
     end
-    
+
 end
 
 function Player:GetCanCrouch()
@@ -2259,6 +2377,15 @@ function Player:GetGameStarted()
     return self.gameStarted
 end
 
+function Player:GetCountdownActive()
+    local gameInfoEnt = GetGameInfoEntity()
+    if not gameInfoEnt then
+        return false
+    end
+
+    return self:GetIsOnPlayingTeam() and gameInfoEnt:GetCountdownActive()
+end
+
 function Player:GetGameBuyTime()
     return self.gameBuytime
 end
@@ -2297,51 +2424,51 @@ function Player:OnTag(tagName)
 
     PROFILE("Player:OnTag")
     local crouching = HasMixin(self, "CrouchMove") and self:GetCrouching()
-    
-    // Log("%s: tag %s (%s)", self, tagName, kStepTagNames[tagName])
-    
+
+    -- Log("%s: tag %s (%s)", self, tagName, kStepTagNames[tagName])
+
     -- Filter out crouch steps from playing at inappropriate times.
     if tagName == "step_crouch" and not crouching then
         return
     end
-    
+
     -- Play footstep when foot hits the ground. Client side only. And only if we
     --- are close enough to the local player...
     if Client and kStepTagNames[tagName] and self:GetPlayFootsteps() then
         self:TriggerFootstep()
     end
-    
+
 end
 
 function Player:OnUpdateAnimationInput(modelMixin)
 
     PROFILE("Player:OnUpdateAnimationInput")
-    
+
     local moveState = "idle"
     if not self:GetIsIdle() then
         moveState = "run"
     end
     modelMixin:SetAnimationInput("move", moveState)
-    
+
     local activeWeapon = "none"
     local weapon = self:GetActiveWeapon()
     if weapon ~= nil then
-    
+
         if weapon.OverrideWeaponName then
             activeWeapon = weapon:OverrideWeaponName()
-        else
+        elseif weapon.GetMapName then
             activeWeapon = weapon:GetMapName()
         end
-        
+
     end
-    
+
     modelMixin:SetAnimationInput("weapon", activeWeapon)
-    
-    local weapon = self:GetActiveWeapon()
+
+    local weapon = self:GetActiveWeapon()  -- animation may have changed active weapon
     if weapon ~= nil and weapon.OnUpdateAnimationInput then
         weapon:OnUpdateAnimationInput(modelMixin)
     end
-    
+
 end
 
 function Player:GetSpeedScalar()
@@ -2360,11 +2487,11 @@ function Player:RetrieveMove()
 end
 
 function Player:GetCanControl()
-    return not self.isMoveBlocked and self:GetIsAlive() and ( not HasMixin(self, "Stun") or not self:GetIsStunned() ) and not self.countingDown
+    return not self.isMoveBlocked and self:GetIsAlive() and ( not HasMixin(self, "Stun") or not self:GetIsStunned() ) and not self:GetCountdownActive() and not ConcedeSequence.GetIsPlayerObserving(self)
 end
 
 function Player:GetCanAttack()
-    return not self:GetIsUsing()
+    return not self:GetIsUsing() and not ConcedeSequence.GetIsPlayerObserving(self)
 end
 
 function Player:TriggerInvalidSound()
@@ -2411,6 +2538,7 @@ function Player:OnCreateCollisionModel()
     collisionModel:RemoveCollisionRep(CollisionRep.Move)
     
 end
+
 
 function Player:GetWeaponUpgradeLevel()
 
@@ -2526,7 +2654,7 @@ function Player:UpdateArmorAmount(armorLevel)
     if newMaxArmor ~= self.maxArmor then    
     
         self.maxArmor = newMaxArmor
-        self:SetArmor(self.maxArmor * armorPercent)
+        self:SetArmor(self.maxArmor * armorPercent, true)
         
     end
     

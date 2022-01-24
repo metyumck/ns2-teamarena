@@ -1,11 +1,11 @@
-// ======= Copyright (c) 2003-2012, Unknown Worlds Entertainment, Inc. All rights reserved. =======
-//
-// lua\Marine.lua
-//
-//    Created by:   Charlie Cleveland (charlie@unknownworlds.com) and
-//                  Max McGuire (max@unknownworlds.com)
-//
-// ========= For more information, visit us at http://www.unknownworlds.com =====================
+-- ======= Copyright (c) 2003-2012, Unknown Worlds Entertainment, Inc. All rights reserved. =======
+--
+-- lua\Marine.lua
+--
+--    Created by:   Charlie Cleveland (charlie@unknownworlds.com) and
+--                  Max McGuire (max@unknownworlds.com)
+--
+-- ========= For more information, visit us at http://www.unknownworlds.com =====================
 
 Script.Load("lua/Player.lua")
 Script.Load("lua/Mixins/BaseMoveMixin.lua")
@@ -18,6 +18,8 @@ Script.Load("lua/OrderSelfMixin.lua")
 Script.Load("lua/MarineActionFinderMixin.lua")
 Script.Load("lua/StunMixin.lua")
 Script.Load("lua/NanoShieldMixin.lua")
+Script.Load("lua/FireMixin.lua")
+Script.Load("lua/CatPackMixin.lua")
 Script.Load("lua/SprintMixin.lua")
 Script.Load("lua/InfestationTrackerMixin.lua")
 Script.Load("lua/WeldableMixin.lua")
@@ -25,7 +27,6 @@ Script.Load("lua/ScoringMixin.lua")
 Script.Load("lua/UnitStatusMixin.lua")
 Script.Load("lua/DissolveMixin.lua")
 Script.Load("lua/MapBlipMixin.lua")
-Script.Load("lua/VortexAbleMixin.lua")
 Script.Load("lua/HiveVisionMixin.lua")
 Script.Load("lua/DisorientableMixin.lua")
 Script.Load("lua/LOSMixin.lua")
@@ -41,7 +42,8 @@ Script.Load("lua/PhaseGateUserMixin.lua")
 Script.Load("lua/Weapons/PredictedProjectile.lua")
 Script.Load("lua/MarineVariantMixin.lua")
 Script.Load("lua/MarineOutlineMixin.lua")
-Script.Load("lua/Armory.lua")
+Script.Load("lua/RegenerationMixin.lua")
+Script.Load("lua/Hud/GUINotificationMixin.lua")
 
 if Client then
     Script.Load("lua/TeamMessageMixin.lua")
@@ -61,10 +63,11 @@ PrecacheAsset("models/marine/marine.surface_shader")
 PrecacheAsset("models/marine/marine_noemissive.surface_shader")
 
 Marine.kFlashlightSoundName = PrecacheAsset("sound/NS2.fev/common/light")
-Marine.kGunPickupSound = PrecacheAsset("sound/NS2.fev/marine/common/pickup_gun")
+--Marine.kGunPickupSound = PrecacheAsset("sound/NS2.fev/marine/common/pickup_gun")
 Marine.kSpendResourcesSoundName = PrecacheAsset("sound/NS2.fev/marine/common/player_spend_nanites")
 Marine.kChatSound = PrecacheAsset("sound/NS2.fev/marine/common/chat")
 Marine.kSoldierLostAlertSound = PrecacheAsset("sound/NS2.fev/marine/voiceovers/soldier_lost")
+Marine.kFlashlightGoboTexture = PrecacheAsset( "models/marine/male/flashlight.dds")
 
 Marine.kFlinchEffect = PrecacheAsset("cinematics/marine/hit.cinematic")
 Marine.kFlinchBigEffect = PrecacheAsset("cinematics/marine/hit_big.cinematic")
@@ -72,7 +75,7 @@ Marine.kFlinchBigEffect = PrecacheAsset("cinematics/marine/hit_big.cinematic")
 Marine.kHitGroundStunnedSound = PrecacheAsset("sound/NS2.fev/marine/common/jump")
 Marine.kSprintStart = PrecacheAsset("sound/NS2.fev/marine/common/sprint_start")
 Marine.kSprintTiredEnd = PrecacheAsset("sound/NS2.fev/marine/common/sprint_tired")
-//The longer running sound, sprint_start, would be ideally the sprint_end soudn instead. That is what is done here
+--The longer running sound, sprint_start, would be ideally the sprint_end soudn instead. That is what is done here
 Marine.kSprintStartFemale = PrecacheAsset("sound/NS2.fev/marine/common/sprint_tired_female")                                                                      
 Marine.kSprintTiredEndFemale = PrecacheAsset("sound/NS2.fev/marine/common/sprint_start_female")
 
@@ -81,40 +84,43 @@ Marine.kHealth = kMarineHealth
 Marine.kBaseArmor = kMarineArmor
 Marine.kArmorPerUpgradeLevel = kArmorPerUpgradeLevel
 Marine.kMaxSprintFov = 95
-// Player phase delay - players can only teleport this often
+-- Player phase delay - players can only teleport this often
 Marine.kPlayerPhaseDelay = 2
 
-Marine.kWalkMaxSpeed = 5                // Four miles an hour = 6,437 meters/hour = 1.8 meters/second (increase for FPS tastes)
-Marine.kRunMaxSpeed = 6.0               // 10 miles an hour = 16,093 meters/hour = 4.4 meters/second (increase for FPS tastes)
-Marine.kRunInfestationMaxSpeed = 5.2    // 10 miles an hour = 16,093 meters/hour = 4.4 meters/second (increase for FPS tastes)
+Marine.kWalkMaxSpeed = 5                -- Four miles an hour = 6,437 meters/hour = 1.8 meters/second (increase for FPS tastes)
+--Marine.kRunMaxSpeed = 6.0               -- 10 miles an hour = 16,093 meters/hour = 4.4 meters/second (increase for FPS tastes)
+--Marine.kRunInfestationMaxSpeed = 5.2    -- 10 miles an hour = 16,093 meters/hour = 4.4 meters/second (increase for FPS tastes)
+Marine.kRunMaxSpeed = 5.75
+Marine.kRunInfestationMaxSpeed = 5
 
-// How fast does our armor get repaired by welders
+-- How fast does our armor get repaired by welders
 Marine.kArmorWeldRate = kMarineArmorWeldRate
-Marine.kWeldedEffectsInterval = .5
+Marine.kWeldedEffectsInterval = 0.5
 
 Marine.kSpitSlowDuration = 3
 
 Marine.kWalkBackwardSpeedScalar = 0.4
 
-// start the get up animation after stun before giving back control
+-- start the get up animation after stun before giving back control
 Marine.kGetUpAnimationLength = 0
 
-// tracked per techId
+-- tracked per techId
 Marine.kMarineAlertTimeout = 4
 
-local kDropWeaponTimeLimit = 1
-local kPickupWeaponTimeLimit = 1
-
+Marine.kDropWeaponTimeLimit = kWeaponDropRateLimit
+Marine.kFindWeaponRange = 2
+Marine.kPickupWeaponTimeLimit = 1
+Marine.kPickupPriority = { [kTechId.Flamethrower] = 1, [kTechId.GrenadeLauncher] = 2, [kTechId.HeavyMachineGun] = 3, [kTechId.Shotgun] = 4 }
+	
 Marine.kAcceleration = 100
-Marine.kSprintAcceleration = 120 // 70
+Marine.kSprintAcceleration = 120 -- 70
 Marine.kSprintInfestationAcceleration = 60
 
 Marine.kGroundFrictionForce = 16
 
 Marine.kAirStrafeWeight = 2
 
-
-
+Marine.kMarineBuyAutopickupDelayTime = 5 -- Time for a marine player to delay before autopickuping a weapon after buying something. (Buying a GL when having a SG, for example)
 
 PrecacheAsset("models/marine/rifle/rifle_shell_01.dds")
 PrecacheAsset("models/marine/rifle/rifle_shell_01_normal.dds")
@@ -143,8 +149,6 @@ local networkVars =
     ruptured = "boolean",
     interruptAim = "private boolean",
     poisoned = "boolean",
-    catpackboost = "boolean",
-    timeCatpackboost = "private time",
     weaponUpgradeLevel = "integer (0 to 3)",
     
     unitStatusPercentage = "private integer (0 to 100)",
@@ -153,7 +157,7 @@ local networkVars =
     
     timeLastBeacon = "private time",
     
-    weaponBeforeUseId = "private entityid"
+    weaponBeforeUseId = "private compensated entityid"
 }
 
 AddMixinNetworkVars(OrdersMixin, networkVars)
@@ -166,6 +170,9 @@ AddMixinNetworkVars(CameraHolderMixin, networkVars)
 AddMixinNetworkVars(SelectableMixin, networkVars)
 AddMixinNetworkVars(StunMixin, networkVars)
 AddMixinNetworkVars(NanoShieldMixin, networkVars)
+AddMixinNetworkVars(NanoShieldMixin, networkVars)
+AddMixinNetworkVars(FireMixin, networkVars)
+AddMixinNetworkVars(CatPackMixin, networkVars)
 AddMixinNetworkVars(SprintMixin, networkVars)
 AddMixinNetworkVars(OrderSelfMixin, networkVars)
 AddMixinNetworkVars(DissolveMixin, networkVars)
@@ -179,6 +186,8 @@ AddMixinNetworkVars(TunnelUserMixin, networkVars)
 AddMixinNetworkVars(PhaseGateUserMixin, networkVars)
 AddMixinNetworkVars(MarineVariantMixin, networkVars)
 AddMixinNetworkVars(ScoringMixin, networkVars)
+AddMixinNetworkVars(RegenerationMixin, networkVars)
+AddMixinNetworkVars(GUINotificationMixin, networkVars)
 
 function Marine:OnCreate()
 
@@ -206,27 +215,40 @@ function Marine:OnCreate()
     InitMixin(self, PhaseGateUserMixin)
     InitMixin(self, PredictedProjectileShooterMixin)
     InitMixin(self, MarineVariantMixin)
-    
+
+    InitMixin(self, RegenerationMixin)
+    InitMixin(self, GUINotificationMixin)
+
     if Server then
     
         self.timePoisoned = 0
         self.poisoned = false
         
-        // stores welder / builder progress
+        -- stores welder / builder progress
         self.unitStatusPercentage = 0
         self.timeLastUnitPercentageUpdate = 0
         
+        self.grenadesLeft = 0
+        self.grenadeType = nil
+        
+        self.minesLeft = 0
+
     elseif Client then
     
         self.flashlight = Client.CreateRenderLight()
         
         self.flashlight:SetType( RenderLight.Type_Spot )
-        self.flashlight:SetColor( Color(.8, .8, 1) )
-        self.flashlight:SetInnerCone( math.rad(30) )
-        self.flashlight:SetOuterCone( math.rad(35) )
-        self.flashlight:SetIntensity( 10 )
-        self.flashlight:SetRadius( 15 ) 
-        self.flashlight:SetGoboTexture("models/marine/male/flashlight.dds")
+        self.flashlight:SetColor( kDefaultMarineFlashlightColor )
+        self.flashlight:SetInnerCone( math.rad(20) )
+        self.flashlight:SetOuterCone( math.rad(45) )
+        self.flashlight:SetIntensity( 8 )
+        self.flashlight:SetRadius( 28 )
+        self.flashlight:SetAtmosphericDensity( kDefaultMarineFlashlightAtmoDensity )
+        self.flashlight:SetSpecular( true )
+        self.flashlight:SetGoboTexture( self.kFlashlightGoboTexture )
+
+        --Shadows are too expensive, avg 2.7Fps drop, PER flashlight
+        self.flashlight:SetCastsShadows( false )
         
         self.flashlight:SetIsVisible(false)
         
@@ -243,20 +265,20 @@ function Marine:OnCreate()
     self.timeOfLastPickUpWeapon = 0
     self.ruptured = false
     self.interruptAim = false
-    self.catpackboost = false
-    self.timeCatpackboost = 0
+
     self.flashlightLastFrame = false
     self.weaponBeforeUseId = Entity.invalidId
+    self.tertiaryAttackLastFrame = false
     
 end
 
 local function UpdateNanoArmor(self)
-    self.hasNanoArmor = false // self:GetWeapon(Welder.kMapName)
+    self.hasNanoArmor = false -- self:GetWeapon(Welder.kMapName)
     return true
 end
 
 function Marine:GetCanJump()
-    return not self:GetIsWebbed() and ( self:GetIsOnGround() or self:GetIsOnLadder() )
+    return ( self:GetIsOnGround() or self:GetIsOnLadder() )
 end
 
 function Marine:InitTechTree()
@@ -275,30 +297,51 @@ end
 
 function Marine:OnInitialized()
 
-    // work around to prevent the spin effect at the infantry portal spawned from
-    // local player should not see the holo marine model
-    if Client and Client.GetIsControllingPlayer() then
-    
-        local ips = GetEntitiesForTeamWithinRange("InfantryPortal", self:GetTeamNumber(), self:GetOrigin(), 1)
-        if #ips > 0 then
-            Shared.SortEntitiesByDistance(self:GetOrigin(), ips)
-            ips[1]:PreventSpinEffect(0.2)
+    if Client then
+
+        -- work around to prevent the spin effect at the infantry portal spawned from
+        -- local player should not see the holo marine model
+        if Client.GetIsControllingPlayer() then
+
+            local ips = GetEntitiesForTeamWithinRange("InfantryPortal", self:GetTeamNumber(), self:GetOrigin(), 1)
+            if #ips > 0 then
+                Shared.SortEntitiesByDistance(self:GetOrigin(), ips)
+                ips[1]:PreventSpinEffect(0.2)
+            end
+
         end
-        
+
+        self.autoPickup = GetAdvancedOption("autopickup")
+        self.autoPickupBetter = GetAdvancedOption("autopickupbetter")
+
+        Client.SendNetworkMessage("SetAutopickup",
+        {
+            autoPickup = self.autoPickup,
+            autoPickupBetter = self.autoPickupBetter
+        }, true)
+
+    elseif Server then
+
+        -- These are or should be the default values.
+        self.autoPickup = true
+        self.autoPickupBetter = false
+
     end
-    
-    // These mixins must be called before SetModel because SetModel eventually
-    // calls into OnUpdatePoseParameters() which calls into these mixins.
-    // Yay for convoluted class hierarchies!!!
+
+    -- These mixins must be called before SetModel because SetModel eventually
+    -- calls into OnUpdatePoseParameters() which calls into these mixins.
+    -- Yay for convoluted class hierarchies!!!
     InitMixin(self, OrdersMixin, { kMoveOrderCompleteDistance = kPlayerMoveOrderCompleteDistance })
     InitMixin(self, OrderSelfMixin, { kPriorityAttackTargets = { "Harvester" } })
     InitMixin(self, StunMixin)
     InitMixin(self, NanoShieldMixin)
+    InitMixin(self, FireMixin)
+    InitMixin(self, CatPackMixin)    
     InitMixin(self, SprintMixin)
     InitMixin(self, WeldableMixin)
     
-    // SetModel must be called before Player.OnInitialized is called so the attach points in
-    // the Marine are valid to attach weapons to. This is far too subtle...
+    -- SetModel must be called before Player.OnInitialized is called so the attach points in
+    -- the Marine are valid to attach weapons to. This is far too subtle...
     self:SetModel(self:GetVariantModel(), MarineVariantMixin.kMarineAnimationGraph)
     
     Player.OnInitialized(self)
@@ -308,7 +351,7 @@ function Marine:OnInitialized()
         self.armor = self:GetArmorAmount()
         self.maxArmor = self.armor
         
-        // This Mixin must be inited inside this OnInitialized() function.
+        -- This Mixin must be inited inside this OnInitialized() function.
         if not HasMixin(self, "MapBlip") then
             InitMixin(self, MapBlipMixin)
         end
@@ -330,8 +373,8 @@ function Marine:OnInitialized()
         self:AddHelpWidget("GUIMarineHealthRequestHelp", 2)
         self:AddHelpWidget("GUIMarineFlashlightHelp", 2)
         self:AddHelpWidget("GUIBuyShotgunHelp", 2)
-        // No more auto weld orders.
-        //self:AddHelpWidget("GUIMarineWeldHelp", 2)
+        -- No more auto weld orders.
+        --self:AddHelpWidget("GUIMarineWeldHelp", 2)
         self:AddHelpWidget("GUIMapHelp", 1)
         self:AddHelpWidget("GUITunnelEntranceHelp", 1)
         
@@ -344,15 +387,10 @@ function Marine:OnInitialized()
     self.lastYaw = viewAngles.yaw
     self.lastPitch = viewAngles.pitch
     
-    // -1 = leftmost, +1 = right-most
+    -- -1 = leftmost, +1 = right-most
     self.horizontalSwing = 0
-    // -1 = up, +1 = down
+    -- -1 = up, +1 = down
     
-end
-
-local blockBlackArmor = false
-if Server then
-    Event.Hook("Console_blockblackarmor", function() if Shared.GetCheatsEnabled() then blockBlackArmor = not blockBlackArmor end end)
 end
 
 function Marine:GetTechTree()
@@ -363,10 +401,10 @@ function Marine:UpdateTechTree()
 
     PROFILE("Marine:UpdateTechTree")
     
-    // Compute tech tree availability only so often because it's very slooow
+    -- Compute tech tree availability only so often because it's very slooow
     if self.techTree and (self.timeOfLastTechTreeUpdate == nil or Shared.GetTime() > self.timeOfLastTechTreeUpdate + PlayingTeam.kTechTreeUpdateTime) then
 
-        //self.techTree:Update(self.entityTechIds, self.techIdCount)
+        --self.techTree:Update(self.entityTechIds, self.techIdCount)
         
         /*
         local techTreeString = ""        
@@ -378,7 +416,7 @@ function Marine:UpdateTechTree()
         Print("------------------------")
         */
 
-        // Send tech tree base line to players that just switched teams or joined the game        
+        -- Send tech tree base line to players that just switched teams or joined the game        
         
             
             local playerTechTree = self:GetTechTree()
@@ -394,7 +432,7 @@ function Marine:UpdateTechTree()
             
    
         
-        // Send research, availability, etc. tech node updates to team players
+        -- Send research, availability, etc. tech node updates to team players
         self.techTree:SendTechTreeUpdateToPlayer(self)
         
         self.timeOfLastTechTreeUpdate = Shared.GetTime()
@@ -508,6 +546,79 @@ function Marine:OnDestroy()
     
 end
 
+function Marine:ShouldAutopickupWeapons()
+	return self.autoPickup
+end
+
+function Marine:ShouldAutopickupBetterWeapons()
+	return self.autoPickupBetter
+end
+
+function Marine:SetAutopickup( autoPickupEnabled, enablePickupPriorities )
+
+    self.autoPickup = autoPickupEnabled
+    self.autoPickupBetter = enablePickupPriorities
+
+end
+
+local function PickupWeapon(self, weapon, wasAutoPickup)
+    
+    -- some weapons completely replace other weapons (welder > axe).
+    local replacement = weapon.GetReplacementWeaponMapName and weapon:GetReplacementWeaponMapName()
+    local obsoleteWep = replacement and self:GetWeapon(replacement) -- Player walked over weapon with higher priority. Handled by weapon pickupable getter func.
+    local obsoleteSlot
+    local activeWeapon = self:GetActiveWeapon()
+    local activeSlot = activeWeapon and activeWeapon:GetHUDSlot()
+    local delayPassed = (Shared.GetTime() - self.timeOfLastPickUpWeapon > Marine.kMarineBuyAutopickupDelayTime)
+
+    -- find the weapon that is about to be dropped to make room for this one
+    local slot = weapon:GetHUDSlot()
+    local oldWep = self:GetWeaponInHUDSlot(slot)
+
+    -- Delay autopickup if we're replacing/upgrading a weapon (Autopickup Better Weapon).
+    -- This way it won't immediately pick up your old weapon when you buy a lower priority one. (Having a shotgun then buying a grenade launcher, for example)
+    if wasAutoPickup and oldWep and not delayPassed then
+        return
+    end
+
+    if obsoleteWep then
+        
+        -- If we are "using", and the weapon we will switch back to when we're done "using"
+        -- is the weapon we're replacing, make sure we also replace this reference.
+        local obsoleteWepId = obsoleteWep:GetId()
+        if obsoleteWepId == self.weaponBeforeUseId then
+            self.weaponBeforeUseId = weapon:GetId()
+        end
+        
+        obsoleteSlot = obsoleteWep:GetHUDSlot()
+        self:RemoveWeapon(obsoleteWep)
+        DestroyEntity(obsoleteWep)
+    end
+    
+    -- perform the actual weapon pickup (also drops weapon in the slot)
+    self:AddWeapon(weapon, not wasAutoPickup or slot == 1)
+
+    self:TriggerEffects("marine_weapon_pickup", { effecthostcoords = self:GetCoords() })
+    
+    -- switch to the picked up weapon if the player deliberately (non-automatically) picked up the weapon,
+    -- or if the weapon they were picking up automatically replaced a weapon they already had, and they
+    -- currently have no weapons (this avoids the ghost-axe problem).
+    if not wasAutoPickup or
+        (replacement and (self:GetActiveWeapon() == nil or obsoleteSlot == activeSlot)) then
+        self:SetHUDSlotActive(weapon:GetHUDSlot())
+    end
+
+    if HasMixin(weapon, "Live") then
+        weapon:SetHealth(weapon:GetMaxHealth())
+    end
+    
+    self.timeOfLastPickUpWeapon = Shared.GetTime()
+    if oldWep then -- Ensure the last weapon in that slot actually existed and was dropped so you don't override a valid last weapon
+        self.lastDroppedWeapon = oldWep
+    end
+    
+end
+
 function Marine:HandleButtons(input)
 
     PROFILE("Marine:HandleButtons")
@@ -516,7 +627,7 @@ function Marine:HandleButtons(input)
     
     if self:GetCanControl() then
     
-        // Update sprinting state
+        -- Update sprinting state
         self:UpdateSprintingState(input)
         
         local flashlightPressed = bit.band(input.commands, Move.ToggleFlashlight) ~= 0
@@ -527,54 +638,86 @@ function Marine:HandleButtons(input)
             
         end
         self.flashlightLastFrame = flashlightPressed
-         
-       
         
-        if bit.band(input.commands, Move.Drop) ~= 0 and not self:GetIsVortexed() and not self:GetIsUsing() then
-        
-            if Server then
+        local dropPressed = bit.band(input.commands, Move.Drop) ~= 0
+        local usePressed = bit.band(input.commands, Move.Use) ~= 0
+
+        if Server then
             
-                // First check for a nearby weapon to pickup.
-                local nearbyDroppedWeapon = self:GetNearbyPickupableWeapon()
-                if nearbyDroppedWeapon then
-                
-                    if Shared.GetTime() > self.timeOfLastPickUpWeapon + kPickupWeaponTimeLimit then
-                    
-                        if nearbyDroppedWeapon.GetReplacementWeaponMapName then
-                        
-                            local replacement = nearbyDroppedWeapon:GetReplacementWeaponMapName()
-                            local toReplace = self:GetWeapon(replacement)
-                            if toReplace then
-                            
-                                self:RemoveWeapon(toReplace)
-                                DestroyEntity(toReplace)
-                                
-                            end
-                            
-                        end
-                        
-                        self:AddWeapon(nearbyDroppedWeapon, true)
-                        StartSoundEffectAtOrigin(Marine.kGunPickupSound, self:GetOrigin())
-                        
-                        self.timeOfLastPickUpWeapon = Shared.GetTime()
-                        
-                    end
-                    
-                else
-                
-                    // No nearby weapon, drop our current weapon.
-                    self:Drop()
-                    
+            -- search for weapons to auto-pickup nearby.
+            if self.ShouldAutopickupWeapons and self:ShouldAutopickupWeapons() then
+
+                local autopickupWeapon = self:FindNearbyAutoPickupWeapon()
+                if autopickupWeapon then
+                    PickupWeapon(self, autopickupWeapon, true)
                 end
                 
             end
             
+            -- search for weapons to manually pickup nearby.
+            if dropPressed then
+
+                -- drop the active weapon.
+                local activeWeapon = self:GetActiveWeapon()
+                if self:Drop() then
+
+                    self.lastDroppedWeapon = activeWeapon
+                    self.timeOfLastPickUpWeapon = Shared.GetTime()
+                end
+            end
+
+            if usePressed then
+
+                local pickupWeapon = self:GetNearbyPickupableWeapon()
+                -- see if we have a weapon nearby to pickup.
+                if pickupWeapon then
+                    self.timeOfLastPickUpWeapon = Shared.GetTime()
+                    PickupWeapon(self, pickupWeapon, false)
+                end
+            end
         end
-        
     end
-    
 end
 
+function Marine:FindFirstGrenade()
+    local weapons = self:GetWeapons()
+    if weapons ~= nil then
+        for _,v in ipairs(weapons) do
+            if v:isa("GrenadeThrower") then
+                return v
+            end
+        end
+    end
+
+    return nil
+end
+
+function Marine:TertiaryAttack()
+
+    -- Tertiary Attack for a marine for now is the grenade quick throw.
+    local weapon = self:GetActiveWeapon()
+    if weapon and weapon:isa("GrenadeThrower") then
+        weapon:OnTertiaryAttack()
+    else
+
+        -- Allow the player to throw a grenade, even when it's not the active weapon.
+        local grenadeThrower = self:FindFirstGrenade()
+        if grenadeThrower ~= nil and not self.tertiaryAttackLastFrame then
+            self:SetActiveWeapon(grenadeThrower.kMapName)
+            grenadeThrower:OnTertiaryAttack()
+        end
+    end
+end
+
+function Marine:TertiaryAttackEnd()
+
+    -- Tertiary Attack for a marine for now is the grenade quick throw.
+    local activeWeapon = self:GetActiveWeapon()
+
+    if activeWeapon ~= nil and activeWeapon:isa("GrenadeThrower") then
+        activeWeapon:OnTertiaryAttackEnd()
+    end
+end
 
 function Marine:GetFlashlightToggled()
     local edgeOn, edgeOff = self.timeOfLastFlashlightOn, self.timeOfLastFlashlightOff
@@ -621,19 +764,19 @@ function Marine:GetMaxSpeed(possible)
     end
 
     local sprintingScalar = self:GetSprintingScalar()
-    local maxSprintSpeed = Marine.kWalkMaxSpeed + (Marine.kRunMaxSpeed - Marine.kWalkMaxSpeed)*sprintingScalar
-    local maxSpeed = ConditionalValue(self:GetIsSprinting(), maxSprintSpeed, Marine.kWalkMaxSpeed)
+    local maxSprintSpeed = Marine.kWalkMaxSpeed + ( Marine.kRunMaxSpeed - Marine.kWalkMaxSpeed ) * sprintingScalar
+    local maxSpeed = ConditionalValue( self:GetIsSprinting(), maxSprintSpeed, Marine.kWalkMaxSpeed )
     
-    // Take into account our weapon inventory and current weapon. Assumes a vanilla marine has a scalar of around .8.
+    -- Take into account our weapon inventory and current weapon. Assumes a vanilla marine has a scalar of around .8.
     local inventorySpeedScalar = self:GetInventorySpeedScalar() + .17    
     local useModifier = 1
 
     local activeWeapon = self:GetActiveWeapon()
-    if self.isUsing and activeWeapon:GetMapName() == Builder.kMapName then
+    if activeWeapon and self.isUsing and activeWeapon:GetMapName() == Builder.kMapName then
         useModifier = 0.5
     end
-    
-    if self.catpackboost then
+
+    if self:GetHasCatPackBoost() then
         maxSpeed = maxSpeed + kCatPackMoveAddSpeed
     end
     
@@ -645,13 +788,13 @@ function Marine:GetFootstepSpeedScalar()
     return Clamp(self:GetVelocityLength() / (Marine.kRunMaxSpeed * self:GetCatalystMoveSpeedModifier() * self:GetSlowSpeedModifier()), 0, 1)
 end
 
-// Maximum speed a player can move backwards
+-- Maximum speed a player can move backwards
 function Marine:GetMaxBackwardSpeedScalar()
     return Marine.kWalkBackwardSpeedScalar
 end
 
 function Marine:GetControllerPhysicsGroup()
-    return PhysicsGroup.BigPlayerControllersGroup
+    return PhysicsGroup.MarinePlayerGroup
 end
 
 function Marine:GetJumpHeight()
@@ -659,10 +802,10 @@ function Marine:GetJumpHeight()
 end
 
 function Marine:GetCanBeWeldedOverride()
-    return not self:GetIsVortexed() and self:GetArmor() < self:GetMaxArmor(), false
+    return self:GetArmor() < self:GetMaxArmor(), false
 end
 
-// Returns -1 to 1
+-- Returns -1 to 1
 function Marine:GetWeaponSwing()
     return self.horizontalSwing
 end
@@ -674,7 +817,7 @@ end
 local marineTechButtons = { kTechId.Attack, kTechId.Move, kTechId.Defend, kTechId.Construct }
 function Marine:GetTechButtons(techId)
 
-    local techButtons = nil
+    local techButtons
     
     if techId == kTechId.RootMenu then
         techButtons = marineTechButtons
@@ -692,7 +835,7 @@ function Marine:GetDeathMapName()
     return MarineSpectator.kMapName
 end
 
-// Returns the name of the primary weapon
+-- Returns the name of the primary weapon
 function Marine:GetPlayerStatusDesc()
 
     local status = kPlayerStatus.Void
@@ -711,7 +854,9 @@ function Marine:GetPlayerStatusDesc()
             return kPlayerStatus.Shotgun
         elseif (weapon:isa("Flamethrower")) then
             return kPlayerStatus.Flamethrower
-        elseif (weapon:isa("RailPistol")) then
+        elseif (weapon:isa("HeavyMachineGun")) then
+            return kPlayerStatus.HeavyMachineGun
+        elseif (weapon:isa("RailPistol")) then     
             return kPlayerStatus.VIP
         end
     end
@@ -727,8 +872,8 @@ function Marine:GetCanDropWeapon(weapon, ignoreDropTimeLimit)
     
     if weapon ~= nil and weapon.GetIsDroppable and weapon:GetIsDroppable() then
     
-        // Don't drop weapons too fast.
-        if ignoreDropTimeLimit or (Shared.GetTime() > (self.timeOfLastDrop + kDropWeaponTimeLimit)) then
+        -- Don't drop weapons too fast.
+        if ignoreDropTimeLimit or (Shared.GetTime() > (self.timeOfLastDrop + Marine.kDropWeaponTimeLimit)) then
             return true
         end
         
@@ -738,15 +883,8 @@ function Marine:GetCanDropWeapon(weapon, ignoreDropTimeLimit)
     
 end
 
-function Marine:GetCanUseCatPack()
-
-    local enoughTimePassed = self.timeCatpackboost + 6 < Shared.GetTime()
-    return not self.catpackboost or enoughTimePassed
-    
-end
-
-// Do basic prediction of the weapon drop on the client so that any client
-// effects for the weapon can be dealt with.
+-- Do basic prediction of the weapon drop on the client so that any client
+-- effects for the weapon can be dealt with.
 function Marine:Drop(weapon, ignoreDropTimeLimit, ignoreReplacementWeapon)
 
     local activeWeapon = self:GetActiveWeapon()
@@ -772,22 +910,24 @@ function Marine:Drop(weapon, ignoreDropTimeLimit, ignoreReplacementWeapon)
             
         end
         
-        // Tell weapon not to be picked up again for a bit
+        -- Tell weapon not to be picked up again for a bit
         weapon:Dropped(self)
         
-        // Set activity end so we can't drop like crazy
+        -- Set activity end so we can't drop like crazy
         self.timeOfLastDrop = Shared.GetTime() 
         
         if Server then
         
             if ignoreReplacementWeapon ~= true and weapon.GetReplacementWeaponMapName then
             
-                self:GiveItem(weapon:GetReplacementWeaponMapName(), false)
-                // the client expects the next weapon is going to be selected (does not know about the replacement).
-                self:SelectNextWeaponInDirection(1)
+                self:GiveItem(weapon:GetReplacementWeaponMapName(), true)
                 
             end
-            
+
+            if HasMixin(self, "Team") then
+                TeamInfo_SetUserTrackersDirty(self:GetTeamNumber())
+            end
+
         end
         
         return true
@@ -847,20 +987,16 @@ function Marine:OnUseTarget(target)
 
     local activeWeapon = self:GetActiveWeapon()
 
-    if target and HasMixin(target, "Construct") 
+    if activeWeapon and target and HasMixin(target, "Construct")
         and ( target:GetCanConstruct(self) or (target.CanBeWeldedByBuilder and target:CanBeWeldedByBuilder()) )
-        and not 
-            (  target:isa("PowerPoint") and -- is a powerpoint
-            not target:GetIsBuilt() and target.buildFraction == 1 -- which is primed
-            and not target:CanBeCompletedByScriptActor( self ) ) -- but can't be finished
     then
         
         local buildTool = Builder.kMapName
         if self:GetWeapon(Welder.kMapName) ~= nil then
             buildTool = Welder.kMapName
         end
-        
-        if self.weaponBeforeUseId == Entity.invalidId  then
+
+        if not self:GetIsUsing() then
             self.weaponBeforeUseId = activeWeapon:GetId()
             self:SetActiveWeapon(buildTool, true)
         end
@@ -869,29 +1005,31 @@ function Marine:OnUseTarget(target)
         if activeWeapon:GetMapName() == Welder.kMapName then
             self:PrimaryAttack()
         end
-        
+
     else
-        
+
         self:OnUseEnd()
         
     end
 
 end
 
-function Marine:OnUseEnd() 
+function Marine:OnUseEnd()
+
     local activeWeapon = self:GetActiveWeapon()        
 
     if activeWeapon and ( activeWeapon:GetMapName() == Builder.kMapName or activeWeapon:GetMapName() == Welder.kMapName ) and self.weaponBeforeUseId ~= Entity.invalidId then
+
         if activeWeapon:GetMapName() == Welder.kMapName then
             self:PrimaryAttackEnd()
         end
-        local weaponBeforeUse = self.weaponBeforeUseId and (Shared.GetEntity(self.weaponBeforeUseId))
+
+        local weaponBeforeUse = self.weaponBeforeUseId and Shared.GetEntity(self.weaponBeforeUseId)
         if weaponBeforeUse then
-            self:SetActiveWeapon(weaponBeforeUse:GetMapName(),true)
+            self:SetActiveWeapon(weaponBeforeUse:GetMapName(), true)
         end
+
     end
-    
-    self.weaponBeforeUseId = Entity.invalidId
 
 end
 
@@ -918,7 +1056,7 @@ function Marine:OnUpdateAnimationInput(modelMixin)
         catalystSpeed = activeWeapon:GetCatalystSpeedBase()
     end
     
-    if self.catpackboost then
+    if self:GetHasCatPackBoost() then
         catalystSpeed = kCatPackWeaponSpeed * catalystSpeed
     end
 
@@ -943,7 +1081,7 @@ end
 local kStrafeJumpForce = 1
 local kStrafeJumpDelay = 0.7
 function Marine:ModifyJump(input, velocity, jumpVelocity)
-    /*
+    --[[
     local isStrafeJump = input.move.z == 0 and input.move.x ~= 0
     if isStrafeJump and self:GetTimeGroundTouched() + kStrafeJumpDelay < Shared.GetTime() then
     
@@ -957,34 +1095,34 @@ function Marine:ModifyJump(input, velocity, jumpVelocity)
     end
     
     jumpVelocity:Scale(self:GetSlowSpeedModifier())
-    */
+    --]]
 end
 
 function Marine:OnJump()
 
+    --[[
+    Removed as sound event was muted during Sweets sounds-update, b323
     if self.strafeJumped then
         self:TriggerEffects("strafe_jump", {surface = self:GetMaterialBelowPlayer()})           
     end
+    --]]
 
     self:TriggerEffects("jump", {surface = self:GetMaterialBelowPlayer()})
     
-end    
+end     
 
 function Marine:OnProcessMove(input)
 
-    if self.catpackboost then
-        self.catpackboost = Shared.GetTime() - self.timeCatpackboost < kCatPackDuration
-    end
-
     if Server then
-    
-        self.ruptured = Shared.GetTime() - self.timeRuptured < Rupture.kDuration
+        
+        self.ruptured = Shared.GetTime() - self.timeRuptured < kRuptureEffectTime
         self.interruptAim  = Shared.GetTime() - self.interruptStartTime < Gore.kAimInterruptDuration
         
         if self.unitStatusPercentage ~= 0 and self.timeLastUnitPercentageUpdate + 2 < Shared.GetTime() then
             self.unitStatusPercentage = 0
         end    
-        
+
+        --TODO: Create poision mixin
         if self.poisoned then
         
             if self:GetIsAlive() and self.timeLastPoisonDamage + 1 < Shared.GetTime() then
@@ -994,17 +1132,15 @@ function Marine:OnProcessMove(input)
                 local currentHealth = self:GetHealth()
                 local poisonDamage = kBitePoisonDamage
                 
-                // never kill the marine with poison only
+                -- never kill the marine with poison only
                 if currentHealth - poisonDamage < kPoisonDamageThreshhold then
                     poisonDamage = math.max(0, currentHealth - kPoisonDamageThreshhold)
                 end
                 
-                local killedFromDamage, damageDone = self:DeductHealth(poisonDamage, attacker, nil, true)
+                local _, damageDone = self:DeductHealth(poisonDamage, attacker, nil, true)
 
                 if attacker then
-                
-                    SendDamageMessage( attacker, self, damageDone, self:GetOrigin(), damageDone )
-                
+                    SendDamageMessage( attacker, self:GetId(), damageDone, self:GetOrigin(), damageDone )
                 end
             
                 self.timeLastPoisonDamage = Shared.GetTime()   
@@ -1020,12 +1156,12 @@ function Marine:OnProcessMove(input)
             
         end
         
-        // check nano armor
+        -- check nano armor
         if not self:GetIsInCombat() and self.hasNanoArmor then            
             self:SetArmor(self:GetArmor() + input.time * kNanoArmorHealPerSecond, true)            
         end
         
-        //replenish health and ammo out of combat
+        --replenish health and ammo out of combat
         if not self:GetIsInCombat() then
             self:AddHealth(1, false, true)
             for i = 0, self:GetNumChildren() - 1 do
@@ -1065,15 +1201,14 @@ function Marine:OnPostUpdateCamera(deltaTime)
     
 end
 
-function Marine:GetHasCatpackBoost()
-    return self.catpackboost
-end
-
-// dont allow marines to me chain stomped. this gives them breathing time and the onos needs to time the stomps instead of spamming
-// and being able to permanently disable the marine
+-- dont allow marines to me chain stomped. this gives them breathing time and the onos needs to time the stomps instead of spamming
+-- and being able to permanently disable the marine
 function Marine:GetIsStunAllowed()
-    return not self.timeLastStun or self.timeLastStun + kDisruptMarineTimeout < Shared.GetTime() and not self:GetIsVortexed()
+    return not self.timeLastStun or self.timeLastStun + kDisruptMarineTimeout < Shared.GetTime()
 end
 
+function Marine:GetBodyYawTurnThreshold()
+    return -Math.Radians(85), Math.Radians(25)
+end
 
 Shared.LinkClassToMap("Marine", Marine.kMapName, networkVars, true)

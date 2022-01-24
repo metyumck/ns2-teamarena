@@ -1,13 +1,12 @@
-// ======= Copyright (c) 2003-2012, Unknown Worlds Entertainment, Inc. All rights reserved. =======
-//
-// lua\Marine_Client.lua
-//
-//    Created by:   Charlie Cleveland (charlie@unknownworlds.com) and
-//                  Max McGuire (max@unknownworlds.com)
-//
-// ========= For more information, visit us at http://www.unknownworlds.com =====================
+-- ======= Copyright (c) 2003-2012, Unknown Worlds Entertainment, Inc. All rights reserved. =======
+--
+-- lua\Marine_Client.lua
+--
+--    Created by:   Charlie Cleveland (charlie@unknownworlds.com) and
+--                  Max McGuire (max@unknownworlds.com)
+--
+-- ========= For more information, visit us at http:--www.unknownworlds.com =====================
 
-Marine.k2DHUDFlash = "ui/marine_hud_2d.swf"
 Marine.kBuyMenuTexture = "ui/marine_buymenu.dds"
 Marine.kBuyMenuUpgradesTexture = "ui/marine_buymenu_upgrades.dds"
 Marine.kBuyMenuiconsTexture = "ui/marine_buy_icons.dds"
@@ -21,6 +20,7 @@ local kRuptureMaterial = PrecacheAsset("cinematics/vfx_materials/rupture.materia
 local kHighlightMaterial = PrecacheAsset("cinematics/vfx_materials/marine_highlight.material")
 
 Marine.kSpitHitEffectDuration = 1
+Marine.kBigMacFirstPersonDeathEffect = PrecacheAsset("cinematics/marine/bigmac/death_1p.cinematic")
 
 local kSensorBlipSize = 25
 
@@ -40,7 +40,6 @@ function MarineUI_GetHasArmsLab()
     
 end
 
-
 function PlayerUI_GetSensorBlipInfo()
 
     PROFILE("PlayerUI_GetSensorBlipInfo")
@@ -51,16 +50,16 @@ function PlayerUI_GetSensorBlipInfo()
     if player then
     
         local eyePos = player:GetEyePos()
-        for index, blip in ientitylist(Shared.GetEntitiesWithClassname("SensorBlip")) do
+        for _, blip in ientitylist(Shared.GetEntitiesWithClassname("SensorBlip")) do
         
             local blipOrigin = blip:GetOrigin()
             local blipEntId = blip.entId
             local blipName = ""
             
-            // Lookup more recent position of blip
+            -- Lookup more recent position of blip
             local blipEntity = Shared.GetEntity(blipEntId)
             
-            // Do not display a blip for the local player.
+            -- Do not display a blip for the local player.
             if blipEntity ~= player then
 
                 if blipEntity then
@@ -77,31 +76,32 @@ function PlayerUI_GetSensorBlipInfo()
                     blipName = ""
                 end
                 
-                // Get direction to blip. If off-screen, don't render. Bad values are generated if 
-                // Client.WorldToScreen is called on a point behind the camera.
+                -- Get direction to blip. If off-screen, don't render. Bad values are generated if 
+                -- Client.WorldToScreen is called on a point behind the camera.
                 local normToEntityVec = GetNormalizedVector(blipOrigin - eyePos)
                 local normViewVec = player:GetViewAngles():GetCoords().zAxis
                
                 local dotProduct = normToEntityVec:DotProduct(normViewVec)
                 if dotProduct > 0 then
                 
-                    // Get distance to blip and determine radius
+                    -- Get distance to blip and determine radius
                     local distance = (eyePos - blipOrigin):GetLength()
                     local drawRadius = kSensorBlipSize/distance
                     
-                    // Compute screen xy to draw blip
+                    -- Compute screen xy to draw blip
                     local screenPos = Client.WorldToScreen(blipOrigin)
 
-                    /*
+     
+                    --[[
                     local trace = Shared.TraceRay(eyePos, blipOrigin, CollisionRep.LOS, PhysicsMask.Bullets, EntityFilterTwo(player, entity))                               
                     local obstructed = ((trace.fraction ~= 1) and ((trace.entity == nil) or trace.entity:isa("Door"))) 
                     
                     if not obstructed and entity and not entity:GetIsVisible() then
                         obstructed = true
                     end
-                    */
+                    --]]
                     
-                    // Add to array (update numElementsPerBlip in GUISensorBlips:UpdateBlipList)
+                    -- Add to array (update numElementsPerBlip in GUISensorBlips:UpdateBlipList)
                     table.insert(blips, screenPos.x)
                     table.insert(blips, screenPos.y)
                     table.insert(blips, drawRadius)
@@ -153,6 +153,11 @@ function Marine:UpdateClientEffects(deltaTime, isLocal)
         self:UpdateGhostModel()
         
         UpdatePoisonedEffect(self)
+
+        if self.lastAliveClient ~= self:GetIsAlive() then
+            ClientUI.SetScriptVisibility("Hud/Marine/GUIMarineHUD", "Alive", self:GetIsAlive())
+            self.lastAliveClient = self:GetIsAlive()
+        end
         
         local marineHUD = ClientUI.GetScript("Hud/Marine/GUIMarineHUD")
         if marineHUD then
@@ -179,10 +184,10 @@ function Marine:UpdateClientEffects(deltaTime, isLocal)
         end
         
         local stunned = HasMixin(self, "Stun") and self:GetIsStunned()
-        local blurEnabled = self.buyMenu ~= nil or stunned
+        local blurEnabled = self.buyMenu ~= nil or stunned or (self.viewingHelpScreen == true)
         self:SetBlurEnabled(blurEnabled)
         
-        // update spit hit effect
+        -- update spit hit effect
         if not Shared.GetIsRunningPrediction() then
         
             if self.timeLastSpitHit ~= self.timeLastSpitHitEffect then
@@ -253,29 +258,49 @@ function Marine:OnUpdateRender()
     
     local isLocal = self:GetIsLocalPlayer()
     
-    // Synchronize the state of the light representing the flash light.
+    -- Synchronize the state of the light representing the flash light.
     self.flashlight:SetIsVisible(self.flashlightOn and (isLocal or self:GetIsVisible()) )
     
     if self.flashlightOn then
-    
-        local coords = Coords(self:GetViewCoords())
-        coords.origin = coords.origin + coords.zAxis * 0.75
+        
+        local angles = self:GetViewAnglesForRendering()
+        local coords = angles:GetCoords()
+        coords.origin = self:GetEyePos() + coords.zAxis * 0.75
         
         self.flashlight:SetCoords(coords)
         
-        // Only display atmospherics for third person players.
-        local density = 0.2
+
+        -- Only display atmospherics for third person players.
+        local density = kDefaultMarineFlashlightAtmoDensity
         if isLocal and not self:GetIsThirdPerson() then
             density = 0
         end
         self.flashlight:SetAtmosphericDensity(density)
         
+        --[=[
+        if gFlashlightDirty then
+            self.flashlight:SetIntensity( gActiveFlashlightData.intensity )
+            self.flashlight:SetRadius( gActiveFlashlightData.dist )
+            self.flashlight:SetOuterCone( gActiveFlashlightData.outrad )
+            self.flashlight:SetInnerCone( gActiveFlashlightData.inrad )
+            self.flashlight:SetCastsShadows( gActiveFlashlightData.shadows )
+            self.flashlight:SetShadowFadeRate( gActiveFlashlightData.shadfade )
+            self.flashlight:SetSpecular( gActiveFlashlightData.specular )
+            self.flashlight:SetAtmosphericDensity( gActiveFlashlightData.atmod )
+            self.flashlight:SetColor( gActiveFlashlightData.color )
+            if gActiveFlashlightData.goboFile then
+                self.flashlight:SetGoboTexture( gActiveFlashlightData.goboFile )
+            end
+            Log("--Updated Flashlight Properties--")
+            gFlashlightDirty = false
+        end
+        --]=]
+
     end
     
+    --[[ disabled for now
     local localPlayer = Client.GetLocalPlayer()
     local showHighlight = localPlayer ~= nil and localPlayer:isa("Alien") and self:GetIsAlive()
-    
-    /* disabled for now
     local model = self:GetRenderModel()
 
     if model then
@@ -296,9 +321,7 @@ function Marine:OnUpdateRender()
         end
     
     end
-    */
-
-end
+    --]]
 
 function Marine:AddNotification(locationId, techId)
 
@@ -312,7 +335,7 @@ function Marine:AddNotification(locationId, techId)
 
 end
 
-// this function returns the oldest notification and clears it from the list
+-- this function returns the oldest notification and clears it from the list
 function Marine:GetAndClearNotification()
 
     local notification = nil
@@ -363,17 +386,17 @@ function MarineUI_GetCurrentHostStructure()
 end
 
 
-// Bring up buy menu
+-- Bring up buy menu
 function Marine:BuyMenu()
 
-    // Don't allow display in the ready room
+    -- Don't allow display in the ready room
     if self:GetTeamNumber() ~= 0 and Client.GetLocalPlayer() == self then
     
         if not self.buyMenu then
         
             self.buyMenu = GetGUIManager():CreateGUIScript("GUIMarineBuyMenu")
             MouseTracker_SetIsVisible(true, "ui/Cursor_MenuDefault.dds", true)
-            //MarineUI_SetHostStructure(structure)
+            --MarineUI_SetHostStructure(structure)
             
             if structure then
                 self.buyMenu:SetHostStructure(structure)
@@ -403,33 +426,11 @@ function Marine:UpdateMisc(input)
     
 end
 
-// Give dynamic camera motion to the player
-/*
-function Marine:PlayerCameraCoordsAdjustment(cameraCoords) 
-
-    if self:GetIsFirstPerson() then
-        
-        if self:GetIsStunned() then
-            local attachPointOffset = self:GetAttachPointOrigin("Head") - cameraCoords.origin
-            attachPointOffset.x = attachPointOffset.x * .5
-            attachPointOffset.z = attachPointOffset.z * .5
-            cameraCoords.origin = cameraCoords.origin + attachPointOffset
-        end
-    
-    end
-    
-    return cameraCoords
-
-end*/
-
 function Marine:OnCountDown()
 
     Player.OnCountDown(self)
     
-    local script = ClientUI.GetScript("Hud/Marine/GUIMarineHUD")
-    if script then
-        script:SetIsVisible(false)
-    end
+    ClientUI.SetScriptVisibility("Hud/Marine/GUIMarineHUD", "Countdown", false)
     
 end
 
@@ -437,18 +438,17 @@ function Marine:OnCountDownEnd()
 
     Player.OnCountDownEnd(self)
     
+    ClientUI.SetScriptVisibility("Hud/Marine/GUIMarineHUD", "Countdown", true)
+    
     local script = ClientUI.GetScript("Hud/Marine/GUIMarineHUD")
     if script then
-    
-        script:SetIsVisible(true)
         script:TriggerInitAnimations()
-        
     end
     
 end
 
 function Marine:OnOrderSelfComplete(orderType)
-    self:TriggerEffects("complete_order")
+    self:TriggerEffects(ConditionalValue(PlayerUI_GetTypeAutoOrderOrPheromone(orderType), "complete_autoorder", "complete_order"))
 end
 
 function Marine:GetSpeedDebugSpecial()
@@ -489,4 +489,19 @@ end
 
 function Marine:GetIsPlacementValid()
     return self.ghostStructureValid
+end
+
+function Marine:GetFirstPersonDeathEffect()
+    if self.marineType == kMarineVariantsBaseType.bigmac then
+        return Marine.kBigMacFirstPersonDeathEffect
+    end
+    return (Player.GetFirstPersonDeathEffect(self))
+end
+
+function Marine:GetCanSeeConstructIcon(ofEntity)
+    if ofEntity:isa("PowerPoint") then
+        return ofEntity:HasUnbuiltConsumerRequiringPower()
+    end
+
+    return true
 end

@@ -1,10 +1,10 @@
-// ======= Copyright (c) 2003-2011, Unknown Worlds Entertainment, Inc. All rights reserved. =======
-//
-// lua\InfantryPortal.lua
-//
-//    Created by:   Charlie Cleveland (charlie@unknownworlds.com) 
-//
-// ========= For more information, visit us at http://www.unknownworlds.com =====================
+-- ======= Copyright (c) 2003-2011, Unknown Worlds Entertainment, Inc. All rights reserved. =======
+--
+-- lua\InfantryPortal.lua
+--
+--    Created by:   Charlie Cleveland (charlie@unknownworlds.com)
+--
+-- ========= For more information, visit us at http://www.unknownworlds.com =====================
 
 Script.Load("lua/Mixins/ModelMixin.lua")
 Script.Load("lua/LiveMixin.lua")
@@ -34,17 +34,22 @@ Script.Load("lua/DissolveMixin.lua")
 Script.Load("lua/PowerConsumerMixin.lua")
 Script.Load("lua/GhostStructureMixin.lua")
 Script.Load("lua/MapBlipMixin.lua")
-Script.Load("lua/VortexAbleMixin.lua")
 Script.Load("lua/InfestationTrackerMixin.lua")
 Script.Load("lua/SupplyUserMixin.lua")
 Script.Load("lua/IdleMixin.lua")
 Script.Load("lua/ParasiteMixin.lua")
+Script.Load("lua/FilteredCinematicMixin.lua")
+
+if Client then
+    Script.Load("lua/GraphDrivenModel.lua")
+end
 
 class 'InfantryPortal' (ScriptActor)
 
 local kSpinEffect = PrecacheAsset("cinematics/marine/infantryportal/spin.cinematic")
 local kAnimationGraph = PrecacheAsset("models/marine/infantry_portal/infantry_portal.animation_graph")
 local kHoloMarineModel = PrecacheAsset("models/marine/male/male_spawn.model")
+local kMarineAnimationGraph = PrecacheAsset("models/marine/male/male.animation_graph")
 
 local kHoloMarineMaterialname = PrecacheAsset("cinematics/vfx_materials/marine_ip_spawn.material")
 
@@ -72,7 +77,9 @@ local kPushImpulseStrength = 40
 
 local networkVars =
 {
-    queuedPlayerId = "entityid"
+    queuedPlayerId = "entityid",
+    queuedPlayerModel = string.format("string (%d)", 128 ),
+    queuedPlayerStartTime = "time",
 }
 
 AddMixinNetworkVars(BaseModelMixin, networkVars)
@@ -93,7 +100,6 @@ AddMixinNetworkVars(OrdersMixin, networkVars)
 AddMixinNetworkVars(DissolveMixin, networkVars)
 AddMixinNetworkVars(PowerConsumerMixin, networkVars)
 AddMixinNetworkVars(GhostStructureMixin, networkVars)
-AddMixinNetworkVars(VortexAbleMixin, networkVars)
 AddMixinNetworkVars(SelectableMixin, networkVars)
 AddMixinNetworkVars(IdleMixin, networkVars)
 AddMixinNetworkVars(ParasiteMixin, networkVars)
@@ -103,37 +109,57 @@ local function CreateSpinEffect(self)
     if not self.spinCinematic then
     
         self.spinCinematic = Client.CreateCinematic(RenderScene.Zone_Default)
-        self.spinCinematic:SetCinematic(kSpinEffect)
+        self.spinCinematic:SetCinematic(FilterCinematicName(kSpinEffect))
         self.spinCinematic:SetCoords(self:GetCoords())
         self.spinCinematic:SetRepeatStyle(Cinematic.Repeat_Endless)
     
     end
     
+    local marineVariant = Client.GetOptionInteger("marineVariant", kDefaultMarineVariant)
+    local modelPath = ""
+    
     if not self.fakeMarineModel and not self.fakeMarineMaterial then
     
-        self.fakeMarineModel = Client.CreateRenderModel(RenderScene.Zone_Default)
-        self.fakeMarineModel:SetModel(Shared.GetModelIndex(kHoloMarineModel))
+        if self.queuedPlayerModel then
+            modelPath = self.queuedPlayerModel
+        else
+            local sexType = string.lower(Client.GetOptionString("sexType", "Male"))
+            modelPath = "models/marine/" .. sexType .. "/" .. sexType .. GetVariantModel(kMarineVariantsData, marineVariant)
+        end
+
+        local model = PrecacheAsset(modelPath)
+        self.fakeMarineModel = CreateGraphDrivenModel(model, kMarineAnimationGraph)
         
         local coords = self:GetCoords()
         coords.origin = coords.origin + Vector(0, 0.4, 0)
-        
         self.fakeMarineModel:SetCoords(coords)
+        self.fakeMarineModel:SetAnimationInput("move", "idle")
+        self.fakeMarineModel:SetAnimationInput("alive", true)
+        self.fakeMarineModel:SetAnimationInput("body_yaw", 30)
+        self.fakeMarineModel:SetAnimationInput("body_pitch", -8)
+
         self.fakeMarineModel:InstanceMaterials()
-        self.fakeMarineModel:SetMaterialParameter("hiddenAmount", 1.0)
+        self.fakeMarineModel:SetMaterialParameter("hiddenAmount", 0)
+        self.fakeMarineModel:SetMaterialParameter("patchIndex", -2)
         
-        self.fakeMarineMaterial = AddMaterial(self.fakeMarineModel, kHoloMarineMaterialname)
-    
+        self.fakeMarineMaterial = self.fakeMarineModel:AddMaterial(kHoloMarineMaterialname)
+
     end
     
     if self.clientQueuedPlayerId ~= self.queuedPlayerId then
-        self.timeSpinStarted = Shared.GetTime()
+        if self.fakeMarineModel then
+            DestroyGraphDrivenModel(self.fakeMarineModel)
+            self.fakeMarineModel = nil
+            self.fakeMarineMaterial = nil
+        end
+        self.timeSpinStarted = self.queuedPlayerStartTime or Shared.GetTime()
         self.clientQueuedPlayerId = self.queuedPlayerId
     end
     
-    local spawnProgress = Clamp((Shared.GetTime() - self.timeSpinStarted) / kMarineRespawnTime, 0, 1)
-    
-    self.fakeMarineModel:SetIsVisible(true)
-    self.fakeMarineMaterial:SetParameter("spawnProgress", spawnProgress+0.2)    // Add a little so it always fills up
+    if self.fakeMarineModel and self.fakeMarineMaterial then
+        local spawnProgress = Clamp((Shared.GetTime() - self.timeSpinStarted) / kMarineRespawnTime, 0, 1)
+        self.fakeMarineMaterial:SetParameter("spawnProgress", spawnProgress + 0.2)    -- Add a little so it always fills up
+    end
 
 end
 
@@ -146,8 +172,10 @@ local function DestroySpinEffect(self)
     
     end
     
-    if self.fakeMarineModel then    
-        self.fakeMarineModel:SetIsVisible(false)
+    if self.fakeMarineModel then
+        DestroyGraphDrivenModel(self.fakeMarineModel)
+        self.fakeMarineModel = nil
+        self.fakeMarineMaterial = nil
     end
 
 end
@@ -160,7 +188,7 @@ function InfantryPortal:OnCreate()
     InitMixin(self, ModelMixin)
     InitMixin(self, LiveMixin)
     InitMixin(self, GameEffectsMixin)
-    InitMixin(self, FlinchMixin)
+    InitMixin(self, FlinchMixin, { kPlayFlinchAnimations = true })
     InitMixin(self, TeamMixin)
     InitMixin(self, PointGiverMixin)
     InitMixin(self, AchievementGiverMixin)
@@ -177,12 +205,12 @@ function InfantryPortal:OnCreate()
     InitMixin(self, OrdersMixin, { kMoveOrderCompleteDistance = kAIMoveOrderCompleteDistance })
     InitMixin(self, DissolveMixin)
     InitMixin(self, GhostStructureMixin)
-    InitMixin(self, VortexAbleMixin)
     InitMixin(self, PowerConsumerMixin)
     InitMixin(self, ParasiteMixin)
     
     if Client then
         InitMixin(self, CommanderGlowMixin)
+        InitMixin(self, FilteredCinematicMixin)
     end
     
     if Server then
@@ -190,6 +218,7 @@ function InfantryPortal:OnCreate()
     end
     
     self.queuedPlayerId = Entity.invalidId
+    self.queuedPlayer = nil
     
     self:SetLagCompensated(true)
     self:SetPhysicsType(PhysicsType.Kinematic)
@@ -230,7 +259,7 @@ local function InfantryPortalUpdate(self)
         
             local queuedPlayer = Shared.GetEntity(self.queuedPlayerId)
             if queuedPlayer then
-            
+                self.queuedPlayer = queuedPlayer
                 remainingSpawnTime = math.max(0, self.queuedPlayerStartTime + self:GetSpawnTime() - Shared.GetTime())
             
                 if remainingSpawnTime < 0.3 and self.timeLastPush + 0.5 < Shared.GetTime() then
@@ -241,8 +270,9 @@ local function InfantryPortalUpdate(self)
                 end
                 
             else
-            
+                
                 self.queuedPlayerId = nil
+                self.queuedPlayer = nil
                 self.queuedPlayerStartTime = nil
                 
             end
@@ -253,7 +283,7 @@ local function InfantryPortalUpdate(self)
             self:FinishSpawn()
         end
         
-        // Stop spinning if player left server, switched teams, etc.
+        -- Stop spinning if player left server, switched teams, etc.
         if self.timeSpinUpStarted and self.queuedPlayerId == Entity.invalidId then
             StopSpinning(self)
         end
@@ -277,7 +307,7 @@ function InfantryPortal:OnInitialized()
     
         self:AddTimedCallback(InfantryPortalUpdate, kUpdateRate)
         
-        // This Mixin must be inited inside this OnInitialized() function.
+        -- This Mixin must be inited inside this OnInitialized() function.
         if not HasMixin(self, "MapBlip") then
             InitMixin(self, MapBlipMixin)
         end
@@ -299,7 +329,7 @@ function InfantryPortal:OnDestroy()
 
     ScriptActor.OnDestroy(self)
     
-    // Put the player back in queue if there was one hoping to spawn at this now destroyed IP.
+    -- Put the player back in queue if there was one hoping to spawn at this now destroyed IP.
     if Server then
         self:RequeuePlayer()
     elseif Client then
@@ -307,8 +337,8 @@ function InfantryPortal:OnDestroy()
         DestroySpinEffect(self)
         
         if self.fakeMarineModel then
-        
-            Client.DestroyRenderModel(self.fakeMarineModel)
+            
+            DestroyGraphDrivenModel(self.fakeMarineModel)
             self.fakeMarineModel = nil
             self.fakeMarineMaterial = nil
             
@@ -330,7 +360,7 @@ local function QueueWaitingPlayer(self)
 
     if self:GetIsAlive() and self.queuedPlayerId == Entity.invalidId then
 
-        // Remove player from team spawn queue and add here
+        -- Remove player from team spawn queue and add here
         local team = self:GetTeam()
         local playerToSpawn = team:GetOldestQueuedPlayer()
 
@@ -338,11 +368,13 @@ local function QueueWaitingPlayer(self)
             
             playerToSpawn:SetIsRespawning(true)
             team:RemovePlayerFromRespawnQueue(playerToSpawn)
-            
             self.queuedPlayerId = playerToSpawn:GetId()
+            if HasMixin(playerToSpawn, "MarineVariant") then
+                self.queuedPlayerModel = playerToSpawn:GetVariantModel()
+            end
             self.queuedPlayerStartTime = Shared.GetTime()
 
-            self:StartSpinning()            
+            self:StartSpinning()
             
             SendPlayersMessage({ playerToSpawn }, kTeamMessageTypes.Spawning)
             
@@ -372,9 +404,10 @@ end
 
 function InfantryPortal:OnReplace(newStructure)
     newStructure.queuedPlayerId = self.queuedPlayerId
+    newEntityId.queuedPlayer = self.queuedPlayer
 end
 
-// Spawn player on top of IP. Returns true if it was able to, false if way was blocked.
+-- Spawn player on top of IP. Returns true if it was able to, false if way was blocked.
 local function SpawnPlayer(self)
 
     if self.queuedPlayerId ~= Entity.invalidId then
@@ -382,12 +415,18 @@ local function SpawnPlayer(self)
         local queuedPlayer = Shared.GetEntity(self.queuedPlayerId)
         local team = queuedPlayer:GetTeam()
         
-        // Spawn player on top of IP
+        -- Spawn player on top of IP
         local spawnOrigin = self:GetAttachPointOrigin("spawn_point")
         
         local success, player = team:ReplaceRespawnPlayer(queuedPlayer, spawnOrigin, queuedPlayer:GetAngles())
         if success then
-        
+            
+            local weapon = player:GetWeapon(Rifle.kMapName)
+            if weapon then
+                weapon.deployed = true -- start the rifle already deployed
+                weapon.skipDraw = true
+            end
+            
             player:SetCameraDistance(0)
             
             if HasMixin( player, "Controller" ) and HasMixin( player, "AFKMixin" ) then
@@ -424,8 +463,8 @@ function InfantryPortal:GetIsWallWalkingAllowed()
     return false
 end 
 
-// Takes the queued player from this IP and placed them back in the
-// respawn queue to be spawned elsewhere.
+-- Takes the queued player from this IP and placed them back in the
+-- respawn queue to be spawned elsewhere.
 function InfantryPortal:RequeuePlayer()
 
     if self.queuedPlayerId ~= Entity.invalidId then
@@ -440,8 +479,9 @@ function InfantryPortal:RequeuePlayer()
         
     end
     
-    // Don't spawn player.
+    -- Don't spawn player.
     self.queuedPlayerId = Entity.invalidId
+    self.queuedPlayer = nil
     self.queuedPlayerStartTime = nil
 
 end
@@ -452,9 +492,10 @@ if Server then
     
         if self.queuedPlayerId == entityId then
         
-            // Player left or was replaced, either way 
-            // they're not in the queue anymore
+            -- Player left or was replaced, either way
+            -- they're not in the queue anymore
             self.queuedPlayerId = Entity.invalidId
+            self.queuedPlayer = nil
             self.queuedPlayerStartTime = nil
             
         end
@@ -467,7 +508,7 @@ if Server then
         
         StopSpinning(self)
         
-        // Put the player back in queue if there was one hoping to spawn at this now dead IP.
+        -- Put the player back in queue if there was one hoping to spawn at this now dead IP.
         self:RequeuePlayer()
         
     end
@@ -477,8 +518,8 @@ end
 if Server then
 
     function InfantryPortal:FillQueueIfFree()
-    
-        if GetIsUnitActive(self) then
+
+        if not GetWarmupActive() and GetIsUnitActive(self) then
         
             if self.queuedPlayerId == Entity.invalidId then
                 QueueWaitingPlayer(self)
@@ -527,7 +568,7 @@ end
 
 function InfantryPortal:OnPowerOff()
 
-    // Put the player back in queue if there was one hoping to spawn at this IP.
+    -- Put the player back in queue if there was one hoping to spawn at this IP.
     StopSpinning(self)
     self:RequeuePlayer()
     
@@ -546,7 +587,7 @@ end
 
 function InfantryPortal:OnOverrideOrder(order)
 
-    // Convert default to set rally point.
+    -- Convert default to set rally point.
     if order:GetType() == kTechId.Default then
         order:SetType(kTechId.SetRally)
     end
@@ -555,24 +596,26 @@ end
 
 function GetInfantryPortalGhostGuides(commander)
 
+    local entities = { }
+    local ranges = { }
+
     local commandStations = GetEntitiesForTeam("CommandStation", commander:GetTeamNumber())
     local attachRange = LookupTechData(kTechId.InfantryPortal, kStructureAttachRange, 1)
-    local result = { }
     
     for _, commandStation in ipairs(commandStations) do
         if commandStation:GetIsBuilt() then
-            result[commandStation] = attachRange
+            ranges[commandStation] = attachRange
+            table.insert(entities, commandStation)
         end
     end
     
-    return result
+    return entities, ranges
 
 end
 
-local kTraceOffset = 0.1
 function GetCommandStationIsBuilt(techId, origin, normal, commander)
 
-    // check if there is a built command station in our team
+    -- check if there is a built command station in our team
     if not commander then
         return false
     end
@@ -583,16 +626,37 @@ function GetCommandStationIsBuilt(techId, origin, normal, commander)
     
         local cs = GetEntitiesForTeamWithinRange("CommandStation", commander:GetTeamNumber(), origin, 15)
         if cs and #cs > 0 then
-            return cs[1]:GetIsBuilt()
+
+            local ccs = cs[1] -- Hmm...
+            local ips = GetEntitiesForTeamWithinRange("InfantryPortal", commander:GetTeamNumber(), ccs:GetOrigin(), 15)
+            if ips then
+
+                local ipCountValid = #ips < kMaxInfantryPortalsPerCommandStation
+                local built = ccs:GetIsBuilt()
+
+                if ipCountValid and built then
+                    return true
+                elseif not ipCountValid then
+                    return false, "INFANTRY_PORTAL_TOOMANYIPS"
+                end
+            end
+
         end
     
     end
     
+
     return false
 
 end
 
 if Client then
+
+    function InfantryPortal:OnFilteredCinematicOptionChanged()
+        if self.spinCinematic then
+            self.spinCinematic:SetCinematic(FilterCinematicName(kSpinEffect))
+        end
+    end
 
     function InfantryPortal:PreventSpinEffect(duration)
         self.preventSpinDuration = duration
@@ -635,3 +699,31 @@ function InfantryPortal:GetHealthbarOffset()
 end 
 
 Shared.LinkClassToMap("InfantryPortal", InfantryPortal.kMapName, networkVars, true)
+
+-- DEBUG
+if Server then
+    Event.Hook("Console_set_base_yaw", function(client, value)
+    
+        if not Shared.GetTestsEnabled() and not Shared.GetCheatsEnabled() then
+            Log("set_base_yaw requires cheats or tests to be enabled.")
+            return
+        end
+        
+        value = tonumber(value) or 2
+        
+        local player = client:GetPlayer()
+        if not player then
+            Log("no player...")
+            return
+        end
+    
+        if not player.baseYaw then
+            Log("player.baseYaw was nil!")
+            return
+        end
+        
+        Log("Setting baseYaw to %s", value)
+        player.baseYaw = value
+        
+    end)
+end

@@ -1,13 +1,11 @@
---[[
-// ======= Copyright (c) 2003-2012, Unknown Worlds Entertainment, Inc. All rights reserved. =======
-//
-// lua\Player_Client.lua
-//
-//    Created by:   Charlie Cleveland (charlie@unknownworlds.com) and
-//                  Max McGuire (max@unknownworlds.com)
-//
-// ========= For more information, visit us at http://www.unknownworlds.com =====================
-]]
+-- ======= Copyright (c) 2003-2012, Unknown Worlds Entertainment, Inc. All rights reserved. =======
+--
+-- lua\Player_Client.lua
+--
+--    Created by:   Charlie Cleveland (charlie@unknownworlds.com) and
+--                  Max McGuire (max@unknownworlds.com)
+--
+-- ========= For more information, visit us at http://www.unknownworlds.com =====================
 
 Script.Load("lua/Chat.lua")
 Script.Load("lua/HudTooltips.lua")
@@ -16,16 +14,16 @@ Script.Load("lua/Player_Rumble.lua")
 Script.Load("lua/TechTreeConstants.lua")
 Script.Load("lua/GUICommunicationStatusIcons.lua")
 
--- These screen effects are only used on the local player so create them statically.
+-- These screen effects are only used on the local player so create them statically (order does matter)
 Player.screenEffects = { }
+Player.screenEffects.blur = Client.CreateScreenEffect("shaders/Blur.screenfx")
+Player.screenEffects.blur:SetActive(false)
+Player.screenEffects.darkVision = Client.CreateScreenEffect("shaders/DarkVision.screenfx")
+Player.screenEffects.darkVision:SetActive(false)
 Player.screenEffects.fadeBlink = Client.CreateScreenEffect("shaders/FadeBlink.screenfx")
 Player.screenEffects.fadeBlink:SetActive(false)
 Player.screenEffects.lowHealth = Client.CreateScreenEffect("shaders/LowHealth.screenfx")
 Player.screenEffects.lowHealth:SetActive(false)
-Player.screenEffects.darkVision = Client.CreateScreenEffect("shaders/DarkVision.screenfx")
-Player.screenEffects.darkVision:SetActive(false)
-Player.screenEffects.blur = Client.CreateScreenEffect("shaders/Blur.screenfx")
-Player.screenEffects.blur:SetActive(false)
 Player.screenEffects.phase = Client.CreateScreenEffect("shaders/Phase.screenfx")
 Player.screenEffects.phase:SetActive(false)
 Player.screenEffects.gorgetunnel = Client.CreateScreenEffect("shaders/GorgeTunnel.screenfx")
@@ -42,6 +40,8 @@ Player.screenEffects.spectatorTint = Client.CreateScreenEffect("shaders/Spectato
 Player.screenEffects.spectatorTint:SetActive(false)
 Player.screenEffects.catalystVision = Client.CreateScreenEffect("shaders/CatalystVision.screenfx")
 Player.screenEffects.catalystVision:SetActive(false)
+Player.screenEffects.boneShieldVision = Client.CreateScreenEffect("shaders/BoneShieldVision.screenfx")
+Player.screenEffects.boneShieldVision:SetActive(false)
 
 
 local kDefaultPingSound = PrecacheAsset("sound/NS2.fev/common/ping")
@@ -65,25 +65,44 @@ Player.kRangeFinderDistance = 20
 local kLowHealthWarning = 0.35
 local kLowHealthPulseSpeed = 10
 
-Player.kShowGiveDamageTime = 1
+Player.kShowGiveDamageTime = 0.25
 
 local kPhaseEffectActiveTime = 2
 
-gHUDMapEnabled = true
-
 Player.kFirstPersonDeathEffect = PrecacheAsset("cinematics/death_1p.cinematic")
 
-local kVortexed2DStart = "sound/NS2.fev/alien/fade/vortex_start_2D"
-Client.PrecacheLocalSound(kVortexed2DStart)
-local kVortexed2DEnd = "sound/NS2.fev/alien/fade/vortex_end_2D"
-Client.PrecacheLocalSound(kVortexed2DEnd)
-
-local kDeadSound = PrecacheAsset("sound/NS2.fev/common/dead")
+local kDeadSound = PrecacheAsset("sound/NS2.fev/music/dead")
 Client.PrecacheLocalSound(kDeadSound)
 gPlayingDeadMontage = nil
 
 function Player:GetShowUnitStatusForOverride(forEntity)
-    return not GetAreEnemies(self, forEntity) or (forEntity:GetOrigin() - self:GetOrigin()):GetLength() < 8
+    -- Don't show status for dead unit
+    if not self:GetIsAlive() then
+        return false
+    end
+
+    -- Only display status for enemies if player is in 20 m range
+    return not GetAreEnemies(self, forEntity) or (forEntity:GetOrigin() - self:GetOrigin()):GetLengthSquared() < 20 * 20
+end
+
+function PlayerUI_ClearResearchNotifications()
+
+    -- Clear all existing notifications data for the research UI, so we don't get nil tech nodes.
+    local script = ClientUI.GetScript("GUIAlienHUD")
+    if not script then
+        script = ClientUI.GetScript("Hud/Marine/GUIMarineHUD")
+    end
+
+    if script and script.eventDisplay then
+        -- Destroy all the gui items handled by GUIEvent.
+        script.eventDisplay:ClearNotifications()
+    end
+
+    local player = Client.GetLocalPlayer()
+    if player and HasMixin(player, "GUINotification") then
+        player.notifications = { }
+    end
+
 end
 
 function PlayerUI_GetWorldMessages()
@@ -125,6 +144,10 @@ function PlayerUI_GetIsDead()
     local isDead = false
     
     if player then
+        
+        if GetConcedeSequenceActive() then
+            return false
+        end
     
         if HasMixin(player, "Live") then
             isDead = not player:GetIsAlive()
@@ -143,10 +166,6 @@ function PlayerUI_GetIsSpecating()
     
 end
 
-function PlayerUI_GetHUDMapEnabled()
-    return gHUDMapEnabled
-end
-
 function PlayerUI_GetCurrentOrderType()
 
     local player = Client.GetLocalPlayer()
@@ -157,6 +176,10 @@ function PlayerUI_GetCurrentOrderType()
     
     return kTechId.None
     
+end
+
+function PlayerUI_GetTypeAutoOrderOrPheromone(techId)
+    return techId == kTechId.AutoConstruct or techId == kTechId.AutoWeld or techId == kTechId.AutoHeal
 end
 
 function GetRelevantOrdersForPlayer(player)
@@ -175,10 +198,10 @@ function GetRelevantOrdersForPlayer(player)
         end
 
     else
-    
+
         local order = HasMixin(player, "Orders") and player:GetCurrentOrder()
         if order then
-            table.insert(orders, player:GetCurrentOrder())
+            table.insert(orders, order)
         end
         
     end
@@ -296,38 +319,38 @@ end
 function PlayerUI_GetOrderPath()
 
     local player = Client.GetLocalPlayer()
-    if player then
-    
+    if player and Client.kWayPointsEnabled then
+
         if player:isa("Alien") then
-        
+
             local playerOrigin = player:GetOrigin()
             local pheromone = GetMostRelevantPheromone(playerOrigin)
-            if pheromone then
-            
+            if pheromone and (Client.kHintsEnabled or not PlayerUI_GetTypeAutoOrderOrPheromone(pheromone:GetType())) then
+
                 local points = PointArray()
                 local isReachable = Pathing.GetPathPoints(playerOrigin, pheromone:GetOrigin(), points)
                 if isReachable then
                     return points
                 end
-                
+
             end
-            
+
         elseif HasMixin(player, "Orders") then
-        
+
             local currentOrder = player:GetCurrentOrder()
-            if currentOrder then
-            
+            if currentOrder and (Client.kHintsEnabled or not PlayerUI_GetTypeAutoOrderOrPheromone(currentOrder:GetType())) then
+
                 local targetLocation = currentOrder:GetLocation()
                 local points = PointArray()
                 local isReachable = Pathing.GetPathPoints(player:GetOrigin(), targetLocation, points)
                 if isReachable then
                     return points
                 end
-                
+
             end
-            
+
         end
-        
+
     end
     
     return nil
@@ -367,6 +390,17 @@ function PlayerUI_GetBuyMenuDisplaying()
     
 end
 
+function PlayerUI_GetIsEvolving()
+    
+    local player = Client.GetLocalPlayer()
+    if player then
+        return player:isa("Embryo")
+    end
+    
+    return false
+    
+end
+
 local function UnitIsSelectedByLocalCommander(player, unit)
     return player:isa("Commander") and ( unit:isa("Player") or (HasMixin(unit, "Selectable") and unit:GetIsSelected(player:GetTeamNumber())) )
 end
@@ -376,13 +410,15 @@ local kUnitStatusCommanderDisplayRange = 50
 local kDefaultHealthOffset = 1.2
 
 function PlayerUI_GetPositionalInfo(player, unit)
-    
-    local distance = nil
-    local healthBarOrigin = nil
-    local worldOrigin = nil
+
+    PROFILE("PlayerUI_GetPositionalInfo")
+
+    local distance
+    local healthBarOrigin
+    local worldOrigin
     local healthOffsetDirection = player:isa("Commander") and Vector.xAxis or Vector.yAxis
     local eyePos = player:GetEyePos()
-    
+
     local getEngagementPoint = unit.GetEngagementPoint
     local origin = getEngagementPoint and getEngagementPoint(unit) or unit:GetOrigin()
 
@@ -394,104 +430,155 @@ function PlayerUI_GetPositionalInfo(player, unit)
     if dotProduct > 0 then
 
         distance = (origin - eyePos):GetLength()
-            
+
         local healthBarOffset = kDefaultHealthOffset
-        
+
         local getHealthbarOffset = unit.GetHealthbarOffset
         if getHealthbarOffset then
             healthBarOffset = getHealthbarOffset(unit)
         end
-        
+
         healthBarOrigin = origin + healthOffsetDirection * healthBarOffset
-        local worldOrigin = Vector(origin)
         origin = Client.WorldToScreen(origin)
         healthBarOrigin = Client.WorldToScreen(healthBarOrigin)
-        if unit == crossHairTarget then
-        
-            healthBarOrigin.y = math.max(GUIScale(180), healthBarOrigin.y)
-            healthBarOrigin.x = Clamp(healthBarOrigin.x, GUIScale(320), Client.GetScreenWidth() - GUIScale(320))
-            
-        end
-        
     end
-    
+
     return dotProduct, origin, worldOrigin, distance, healthBarOrigin
 
 end
       
 -- Return true if the unit will show status info to the player
 function PlayerUI_ShowsUnitStatusInfo(player, unit)
-    return UnitIsSelectedByLocalCommander(player,unit) or unit == player:GetCrossHairTarget()
+    return UnitIsSelectedByLocalCommander(player, unit) or unit == player:GetCrossHairTarget() or player:GetHasMarkedTarget(unit)
 end
 
 function PlayerUI_GetStatusInfoForUnit(player, unit)
-        
-    local crossHairTarget = PlayerUI_ShowsUnitStatusInfo(player, unit)
-    
+
+    PROFILE("PlayerUI_GetStatusInfoForUnit")
+
     -- checks here if the model was rendered previous frame as well
-    local status = unit:GetUnitStatus(player)
     if unit:GetShowUnitStatusFor(player) then
 
         -- Get direction to blip. If off-screen, don't render. Bad values are generated if
         -- Client.WorldToScreen is called on a point behind the camera.
-        local dotProduct, origin, worldOrigin, distance, healthBarOrigin = PlayerUI_GetPositionalInfo(player, unit) 
-        
+        local dotProduct, origin, worldOrigin, distance, healthBarOrigin = PlayerUI_GetPositionalInfo(player, unit)
+
         if dotProduct > 0 then
+
+            local unitState = unit:GetUnitState(player)
+
+            -- we always want to update the most important unit status informations (hp)
+            local health = 0
+            local armor = 0
+            local regen = 0
+            local healthArmorString
+            local percentageString
+
+            if HasMixin(unit, "Live") and (not unit.GetShowHealthFor or unit:GetShowHealthFor(player)) then
+
+                health = unit:GetHealthFraction()
+                armor = unit:GetArmorScalar()
+
+                if HasMixin(unit, "Regeneration") then
+                    regen = unit:GetRegenerationFraction()
+                end
+
+                if unit:isa("Exo") or unit:isa("Exosuit") then
+                    healthArmorString = string.format("%d",math.max(1, math.ceil(unit:GetArmor())))
+                else
+                    healthArmorString = string.format("%d/%d", math.max(1, math.ceil(unit:GetHealth())), math.ceil(unit:GetArmor()))
+                end
+
+                if (unit:GetMapName() ~= TechPoint.kMapName and unit:GetMapName() ~= ResourcePoint.kPointMapName) then
+
+                    if not unit:isa("Player") or (unit:isa("Embryo") and GetAreEnemies(player, unit)) then
+
+                        percentageString = string.format("%d%%", math.max(1, math.ceil(unit:GetHealthScalar()*100)))
+                    end
+                end
+
+            end
+
+            local losSighted = true
+            if HasMixin(unit, "LOS") then
+                losSighted = unit:GetIsSighted()
+            end
+
+            -- use cached unit state
+            if unitState then
+                -- update position
+                unitState.Position = origin
+                unitState.WorldOrigin = worldOrigin
+                unitState.HealthBarPosition = healthBarOrigin
+
+                --update most important information
+                unitState.HealthFraction = health
+                unitState.RegenFraction = regen
+                unitState.ArmorFraction = armor
+                unitState.HealthAndArmorFraction = healthArmorString
+                unitState.HealthAndArmorPercentage = percentageString
+                unitState.LOSSighted = losSighted or unitState.IsFriend
+
+                return unitState
+            end
 
             local statusFraction = unit:GetUnitStatusFraction(player)
             local description = unit:GetUnitName(player)
             local action = unit:GetActionName(player)
-            local hint = unit:GetUnitHint(player)
-           
-            local health = 0
-            local armor = 0
+            local hint = unit:GetUnitHint2(player)
 
-            local visibleToPlayer = true                        
-            if HasMixin(unit, "Cloakable") and GetAreEnemies(player, unit) then
-            
-                if unit:GetIsCloaked() or (unit:isa("Player") and unit:GetCloakFraction() > 0.2) then
+            local visibleToPlayer = true
+            local isPlayer = unit:isa("Player") and not unit:isa("Embryo")
+            local areEnemies = GetAreEnemies(player, unit)
+        
+            if HasMixin(unit, "Cloakable") and areEnemies then
+
+                if unit:GetIsCloaked() or (isPlayer and unit:GetCloakFraction() > 0.2) then
                     visibleToPlayer = false
                 end
-                
-            end
-            
-            -- Don't show tech points or nozzles if they are attached
-            if (unit:GetMapName() == TechPoint.kMapName or unit:GetMapName() == ResourcePoint.kPointMapName) and unit.GetAttached and (unit:GetAttached() ~= nil) then
-                visibleToPlayer = false
-            end
-            
-            if HasMixin(unit, "Live") and (not unit.GetShowHealthFor or unit:GetShowHealthFor(player)) then
-            
-                health = unit:GetHealthFraction()
-                if unit:GetArmor() == 0 then
-                    armor = 0
-                else 
-                    armor = unit:GetArmorScalar()
-                end
 
             end
-            
-            local badgeTextures = ""
-            
-            if HasMixin(unit, "Player") then
-                if unit.GetShowBadgeOverride and not unit:GetShowBadgeOverride() then
-                    badgeTextures = {}
-                else
+
+            local showsUnitStatusInfo = PlayerUI_ShowsUnitStatusInfo(player, unit)
+            if not showsUnitStatusInfo then
+                description = ""
+                action = ""
+                hint = ""
+            end
+
+            -- Don't show tech points or nozzles if they are attached
+            if visibleToPlayer and (unit:GetMapName() == TechPoint.kMapName or unit:GetMapName() == ResourcePoint.kPointMapName) and unit.GetAttached and (unit:GetAttached() ~= nil) then
+                visibleToPlayer = false
+            end
+
+            local badgeTextures = {}
+
+            if isPlayer then
+                if not unit.GetShowBadgeOverride or unit:GetShowBadgeOverride() then
                     badgeTextures = Badges_GetBadgeTextures(unit:GetClientIndex(), "unitstatus") or {}
                 end
             end
-            
-            local hasWelder = false 
-            if distance < 10 then    
+
+            local hasWelder = false
+            if distance < 10 then
                 hasWelder = unit:GetHasWelder(player)
             end
-            
+
             local abilityFraction = 0
             if player:isa("Commander") then
-                abilityFraction = unit:GetAbilityFraction()
+                abilityFraction = unit:GetAbilityFraction(player)
             end
             
-            local unitState = {
+            local maturityFraction = -1
+            if HasMixin(unit, "Maturity") and not areEnemies then
+                maturityFraction = unit:GetMaturityFraction()
+            end
+
+            local crossHairTarget = visibleToPlayer and showsUnitStatusInfo
+
+            local status = unit:GetUnitStatus(player)
+            unitState =
+            {
                 UnitId = unit:GetId(),
                 Position = origin,
                 WorldOrigin = worldOrigin,
@@ -502,28 +589,35 @@ function PlayerUI_GetStatusInfoForUnit(player, unit)
                 Hint = hint,
                 StatusFraction = statusFraction,
                 HealthFraction = health,
+                RegenFraction = regen,
                 ArmorFraction = armor,
-                IsCrossHairTarget = crossHairTarget and visibleToPlayer,
+                HealthAndArmorFraction = healthArmorString,
+                HealthAndArmorPercentage = percentageString,
+                IsCrossHairTarget = crossHairTarget,
                 TeamType = kNeutralTeamType,
-                ForceName = unit:isa("Player") and not GetAreEnemies(player, unit),
+                ForceName = isPlayer and not areEnemies,
                 BadgeTextures = badgeTextures,
                 HasWelder = hasWelder,
-                IsPlayer = unit:isa("Player"),
-                IsSteamFriend = unit:isa("Player") and unit:GetIsSteamFriend() or false,
+                IsPlayer = isPlayer,
+                IsSteamFriend = isPlayer and unit:GetIsSteamFriend() or false,
                 AbilityFraction = abilityFraction,
-                IsParasited = HasMixin(unit, "ParasiteAble") and unit:GetIsParasited()
+                IsParasited = HasMixin(unit, "ParasiteAble") and unit:GetIsParasited(),
+                CommHealthBarsToggle = visibleToPlayer and player:GetCommHealthBarsShown() and not areEnemies and not unit:isa("Weapon"),
+                MaturityFraction = maturityFraction,
             }
 
-            
             if unit.GetTeamNumber then
                 unitState.IsFriend = (unit:GetTeamNumber() == player:GetTeamNumber())
+                unitState.LOSSighted = losSighted or unitState.IsFriend
+            else
+                unitState.LOSSighted = true
             end
-            
+
             if unit.GetTeamType then
                 unitState.TeamType = unit:GetTeamType()
             end
 
-            if unit:isa("Player") and unit:isa("Marine") and HasMixin(unit, "WeaponOwner") and not GetAreEnemies(player, unit) then
+            if isPlayer and unit:isa("Marine") and HasMixin(unit, "WeaponOwner") and not areEnemies then
                 local primaryWeapon = unit:GetWeaponInHUDSlot(1)
                 if primaryWeapon and primaryWeapon:isa("ClipWeapon") then
                     unitState.PrimaryWeapon = primaryWeapon:GetTechId()
@@ -565,9 +659,16 @@ function PlayerUI_GetStatusInfoForUnit(player, unit)
                 end
             end
             
+            if unit.ShowDestinationOverride then
+                unitState.ShowDestination = unit:ShowDestinationOverride()
+            end
+
+            unit:SetUnitState(player, unitState)
+
             return unitState
         end
     end
+
     return nil
 end
             
@@ -583,7 +684,6 @@ function PlayerUI_GetUnitStatusInfo()
     if player and not player:GetBuyMenuIsDisplaying() and (not player.GetDisplayUnitStates or player:GetDisplayUnitStates()) then
     
         local eyePos = player:GetEyePos()
-        local crossHairTarget = player:GetCrossHairTarget()
         
         local range = kUnitStatusDisplayRange
          
@@ -591,10 +691,8 @@ function PlayerUI_GetUnitStatusInfo()
             range = kUnitStatusCommanderDisplayRange
         end
         
-        local healthOffsetDirection = player:isa("Commander") and Vector.xAxis or Vector.yAxis
-    
-        for index, unit in ipairs(GetEntitiesWithMixinWithinRange("UnitStatus", eyePos, range)) do
-  
+        for _, unit in ipairs(GetEntitiesWithMixinWithinRange("UnitStatus", eyePos, range)) do  
+
             local unitState = PlayerUI_GetStatusInfoForUnit(player, unit)
             
             if unitState then
@@ -609,49 +707,63 @@ function PlayerUI_GetUnitStatusInfo()
 
 end
 
-local kObjectiveOffset = Vector(0, 0.0, 0)
-local kObjectiveDistance = 40
-local function AddObjectives(objectives, className)
+local function AddObjectives(player, objectives, className, yOffset, limit)
+    local ents = GetEntities(className)
+    local cameraCoords = GetRenderCameraCoords()
 
-    local player = Client.GetLocalPlayer()
-    
-    if player then
+    local i = 1
+    local teamNumber = player:GetTeamNumber()
 
-        for index, objective in ientitylist(Shared.GetEntitiesWithClassname(className)) do
-        
-            if objective.showObjective and objective.occupiedTeam ~= player:GetTeamNumber() then
-            
-                local origin = objective:GetOrigin() + kObjectiveOffset
-                            
-                local cameraCoords = GetRenderCameraCoords()
+    local out = {}
+    for _, objective in ipairs(ents) do
+
+        if objective.showObjective and objective.occupiedTeam ~= teamNumber then
+
+            local origin = objective:GetOrigin()
+            local toPosition = GetNormalizedVector(cameraCoords.origin - origin)
+            local dotProduct = cameraCoords.zAxis:DotProduct(toPosition)
+
+            if dotProduct < -0.3 then
+
+                -- Display higher then the origin (world units above the origin)
                 local screenPosition = Vector(0,0,0)
+                VectorCopy(Client.WorldToScreen(origin + Vector(0, yOffset or 0, 0)), screenPosition)
 
-                local toPosition = GetNormalizedVector(cameraCoords.origin - objective:GetOrigin())
-                local distanceFraction = 1 - Clamp((cameraCoords.origin - objective:GetOrigin()):GetLength() / kObjectiveDistance, 0, 1)
-                local dotProduct = cameraCoords.zAxis:DotProduct(toPosition)
-                
-                if dotProduct < 0 then
-                
-                    -- Display higher then the origin (world units above the origin)
-                    local yOffset = ConditionalValue(player:GetTeamType() == kAlienTeamType, .75, 3)
-        
-                    VectorCopy(Client.WorldToScreen(objective:GetOrigin() + Vector(0, yOffset, 0)), screenPosition) 
-                    table.insert(objectives, { Position = screenPosition, TechId = objective:GetTechId(), DistanceFraction = distanceFraction })                    
-                end
-                
-            end    
+                local distance = cameraCoords.origin:GetDistanceSquared(origin)
+                local sortFactor = distance * (1.5 + dotProduct) -- Pioritize objective the player directly looks at
+                table.insert(out, { Position = screenPosition, TechId = objective:GetTechId(), DistanceSquared = distance, SortFactor = sortFactor })
+            end
 
         end
-    
+
     end
 
+    if not limit then
+        table.addtable(out, objectives)
+        return
+    end
+
+    table.sort(out, function(a, b) return a.SortFactor < b.SortFactor end)
+    for i = 1, limit do
+        table.insert(objectives, out[i])
+    end
 end
 
+local kMaxResourcePointObjectives = 2
 function PlayerUI_GetObjectives()
 
-    local objectives = { }
-    --AddObjectives(objectives, "ResourcePoint")
-    AddObjectives(objectives, "TechPoint") 
+    local player = Client.GetLocalPlayer()
+
+    if not player then return end
+
+    local isAlien = player:GetTeamType() == kAlienTeamType
+    local objectives = {}
+
+    local yOffset = isAlien and  .75 or 3
+    AddObjectives(player, objectives, "TechPoint", yOffset)
+
+    yOffset = 1
+    AddObjectives(player, objectives, "ResourcePoint", yOffset, kMaxResourcePointObjectives)
 
     return objectives
     
@@ -676,7 +788,7 @@ function PlayerUI_GetWaypointType()
 
 end
 
-local kAnimateFields = { x = true, y = true, scale = true, dist = true }
+local kAnimateFields = { "x", "y", "scale", "dist" }
 
 --[[
  * Gives the UI the screen space coordinates of where to display
@@ -685,116 +797,125 @@ local kAnimateFields = { x = true, y = true, scale = true, dist = true }
 function PlayerUI_GetFinalWaypointInScreenspace()
 
     local player = Client.GetLocalPlayer()
-    
+
     if not player or GetIsPointInGorgeTunnel(player:GetOrigin()) then
         return nil
     end
-    
+
     local isCommander = player:isa("Commander")
     local currentOrder
-    
+
     if isCommander then
-    
+
         local orders = GetRelevantOrdersForPlayer(player)
         if #orders == 0 then
             return nil
         end
-        
+
         currentOrder = orders[1]
-        
+
     else
-    
+
         if player:isa("Alien") then
             currentOrder = GetMostRelevantPheromone(player:GetOrigin())
         elseif HasMixin(player, "Orders") then
             currentOrder = player:GetCurrentOrder()
         end
-        
+
     end
-    
+
     if not currentOrder then
         return nil
     end
-    
+
     local orderTypeName = GetDisplayNameForTechId(currentOrder:GetType(), "<no display name>")
     local orderType = currentOrder:GetType()
     local orderId = currentOrder:GetId()
-    
+
+    -- Attack orders are always included.
+    if not Client.kWayPointsEnabled and orderType ~= kTechId.Attack then
+        return nil
+    end
+
+    if (not Client.kHintsEnabled and PlayerUI_GetTypeAutoOrderOrPheromone(orderType)) then
+        return nil
+    end
+
     local playerEyePos = Vector(player:GetCameraViewCoords().origin)
     local playerForwardNorm = Vector(player:GetCameraViewCoords().zAxis)
-    
+
     -- This method needs to use the previous updates player info.
     if player.lastPlayerEyePos == nil then
-    
+
         player.lastPlayerEyePos = Vector(playerEyePos)
         player.lastPlayerForwardNorm = Vector(playerForwardNorm)
-        
+
     end
-    
+
     local orderWayPoint
     if currentOrder:isa("Pheromone") then
         orderWayPoint = currentOrder:GetOrigin()
     else
         orderWayPoint = currentOrder:GetLocation()
     end
-    
+
     if not isCommander then
         orderWayPoint = orderWayPoint + Vector(0, 1.5, 0)
     end
-    
+
     local screenPos = Client.WorldToScreen(orderWayPoint)
-    
+
     local isInScreenSpace = false
     local nextWPDir = orderWayPoint - player.lastPlayerEyePos
     local normToEntityVec = GetNormalizedVectorXZ(nextWPDir)
     local normViewVec = GetNormalizedVectorXZ(player.lastPlayerForwardNorm)
     local dotProduct = Math.DotProduct(normToEntityVec, normViewVec)
-    
+
     -- Distance is used for scaling.
     local nextWPDist = nextWPDir:GetLength()
     local nextWPMaxDist = 25
     local nextWPScale = isCommander and 0.3 or math.max(0.5, 1 - (nextWPDist / nextWPMaxDist))
 
-    
+
     if isCommander then
         nextWPDist = 0
     end
-    
+
     if player.nextWPInScreenSpace == nil then
-    
+
         player.nextWPInScreenSpace = true
         player.nextWPDoingTrans = false
         player.nextWPLastVal = { x = 0, y = 0, scale = 0, dist = 0, id = 0 }
 
         player.nextWPCurrWP = Vector(orderWayPoint)
-        
+
     end
-    
+
     -- If the waypoint has changed, do a smooth transition.
     if player.nextWPCurrWP ~= orderWayPoint then
-    
+
         player.nextWPDoingTrans = true
         VectorCopy(orderWayPoint, player.nextWPCurrWP)
-        
+
     end
-    
+
     local returnTable
     local spaceToBorder = ConditionalValue(isCommander, 0, 0.18)
-    
+
     -- If offscreen, fallback on compass method.
     local minWidthBuff = Client.GetScreenWidth() * spaceToBorder
     local minHeightBuff = Client.GetScreenHeight() * spaceToBorder
     local maxWidthBuff = Client.GetScreenWidth() * (1 - spaceToBorder)
     local maxHeightBuff = Client.GetScreenHeight() * (1 - spaceToBorder)
-    
+
     if screenPos.x < minWidthBuff or screenPos.x > maxWidthBuff or
-       screenPos.y < minHeightBuff or screenPos.y > maxHeightBuff or dotProduct < 0 then
-       
+            screenPos.y < minHeightBuff or screenPos.y > maxHeightBuff or dotProduct < 0 then
+
         if player.nextWPInScreenSpace then
             player.nextWPDoingTrans = true
         end
         player.nextWPInScreenSpace = false
-        
+
         local eyeForwardPos = player.lastPlayerEyePos + (player.lastPlayerForwardNorm * 5)
         local eyeForwardToWP = orderWayPoint - eyeForwardPos
         eyeForwardToWP:Normalize()
@@ -803,46 +924,42 @@ function PlayerUI_GetFinalWaypointInScreenspace()
         local screenSpaceDir = eyeForwardToWPScreen - middleOfScreen
         screenSpaceDir:Normalize()
         local finalScreenPos = middleOfScreen + Vector(screenSpaceDir.x * (Client.GetScreenWidth() / 2), screenSpaceDir.y * (Client.GetScreenHeight() / 2), 0)
-        
+
         local showArrow = not isCommander and (finalScreenPos.x < minWidthBuff or finalScreenPos.x > maxWidthBuff or finalScreenPos.y < minHeightBuff or finalScreenPos.y > maxHeightBuff)
-        
+
         -- Clamp to edge of screen with buffer
         finalScreenPos.x = Clamp(finalScreenPos.x, minWidthBuff, maxWidthBuff)
         finalScreenPos.y = Clamp(finalScreenPos.y, minHeightBuff, maxHeightBuff)
-        
-        returnTable = { x = finalScreenPos.x, y = finalScreenPos.y, scale = nextWPScale, name = orderTypeName, dist = nextWPDist, type = orderType, id = orderId, showArrow = showArrow }
-        
+
+        returnTable = { "x", "y", "scale", "name", "dist", "type", "id", "showArrow",
+            x = finalScreenPos.x, y = finalScreenPos.y, scale = nextWPScale, name = orderTypeName, dist = nextWPDist, type = orderType, id = orderId, showArrow = showArrow }
+
     else
-    
+
         isInScreenSpace = true
-        
+
         if not player.nextWPInScreenSpace then
             player.nextWPDoingTrans = true
         end
         player.nextWPInScreenSpace = true
-        
+
         local bounceY = screenPos.y + (math.sin(Shared.GetTime() * 3) * (10 * nextWPScale))
-        
-        returnTable = { x = screenPos.x, y = bounceY, scale = nextWPScale, name = orderTypeName, dist = nextWPDist, type = orderType, id = orderId }
-        
+
+        returnTable = {  "x", "y", "scale", "name", "dist", "type", "id",
+            x = screenPos.x, y = bounceY, scale = nextWPScale, name = orderTypeName, dist = nextWPDist, type = orderType, id = orderId }
+
     end
-    
+
     if player.nextWPDoingTrans then
-    
-        local replaceTable = { }
+
+        local replaceTable = returnTable
         local allEqual = true
 
-        for name, field in pairs(returnTable) do
-
-            if kAnimateFields[name] then
-            
+        for _, name in ipairs(kAnimateFields) do
+            if replaceTable[name] then
                 replaceTable[name] = Slerp(player.nextWPLastVal[name], returnTable[name], 50)
                 allEqual = allEqual and replaceTable[name] == returnTable[name]
-                
-            else
-                replaceTable[name] = returnTable[name]
             end
-            
         end
         
         if allEqual then
@@ -853,8 +970,8 @@ function PlayerUI_GetFinalWaypointInScreenspace()
         
     end
 
-    for name, field in pairs(returnTable) do
-        player.nextWPLastVal[name] = field
+    for _, name in ipairs(returnTable) do
+        player.nextWPLastVal[name] = returnTable[name]
     end
     
     -- Save current for next update.
@@ -890,7 +1007,7 @@ function PlayerUI_GetCrosshairY()
             local index 
             local mapname = weapon:GetMapName()
             
-            if mapname == Rifle.kMapName or mapname == HeavyRifle.kMapName then 
+            if mapname == Rifle.kMapName or mapname == HeavyMachineGun.kMapName then
                 index = 0
             elseif mapname == Pistol.kMapName or mapname == RailPistol.kMapName then
                 index = 1
@@ -1157,18 +1274,12 @@ function PlayerUI_GetCommanderName()
     local commanderName
 
     if player then
-    
         -- we simply use the scoreboard ui here, since it holds all informations required client side
-        local commTable = ScoreboardUI_GetOrderedCommanderNames(player:GetTeamNumber())
-        
-        if table.count(commTable) > 0 then
-            commanderName = commTable[1]
-        end    
-        
+        commanderName = ScoreboardUI_GetCommanderName(player:GetTeamNumber())
     end
-    
+
     return commanderName
-    
+
 end
 
 function PlayerUI_GetWeapon()
@@ -1416,37 +1527,31 @@ function PlayerUI_GetGameLengthTime()
 end
 
 function PlayerUI_GetNumConnectingPlayers()
-    
-    local entityList = Shared.GetEntitiesWithClassname("GameInfo")
 
-    if entityList:GetSize() > 0 then
+    local gameInfo = GetGameInfoEntity()
+    if not gameInfo then return 0 end
 
-        local gameInfo = entityList:GetEntityAtIndex(0)
-        
-        local numPlayersTotal = gameInfo:GetNumPlayersTotal()
-        local numPlayersInGame = #Scoreboard_GetPlayerList()
-        
-        return math.max( 0, numPlayersTotal - numPlayersInGame )
-        
-    end
-    
-    return 0
+    local numClientsTotal = gameInfo:GetNumClientsTotal()
+    local numPlayersInGame = math.max( 0, #Scoreboard_GetPlayerList() - gameInfo:GetNumBots())
+
+    return math.max( 0, numClientsTotal - numPlayersInGame )
+
 end
 
 function PlayerUI_GetNumCommandStructures()
 
     local player = Client.GetLocalPlayer()
-    if player ~= nil then
-    
+    if player then
+
         local teamInfo = GetEntitiesForTeam("TeamInfo", player:GetTeamNumber())
-        if table.count(teamInfo) > 0 then
+        if table.icount(teamInfo) > 0 then
             return teamInfo[1]:GetNumCapturedTechPoints()
         end
-        
+
     end
-    
+
     return 0
-    
+
 end
 
 --[[
@@ -1454,6 +1559,10 @@ end
  * the HUD.
 ]]
 function PlayerUI_GetPlayerResources()
+
+    if GetWarmupActive() then
+        return 100
+    end
 
     local player = Client.GetLocalPlayer()
     if player then
@@ -1498,6 +1607,33 @@ function PlayerUI_GetPlayerHealth()
     
 end
 
+function PlayerUI_GetPlayerRegenerationHealth()
+
+    local player = Client.GetLocalPlayer()
+    if player and HasMixin(player, "Regeneration") then
+
+        return math.ceil(player:GetRegeneratingHealth())
+
+    end
+
+    return 0
+
+end
+
+function PlayerUI_WithinCragRange()
+
+    local player = Client.GetLocalPlayer()
+    if player then
+        for _, crag in ipairs(GetEntitiesForTeamWithinRange("Crag", player:GetTeamNumber(), player:GetOrigin(), Crag.kHealRadius)) do
+            if crag:GetCanHeal() then
+                return true
+            end
+        end
+    end
+
+    return false
+
+end
 function PlayerUI_GetPlayerMaxHealth()
 
     local player = Client.GetLocalPlayer()
@@ -1542,6 +1678,17 @@ function PlayerUI_GetPlayerIsParasited()
     
 end
 
+function PlayerUI_GetPlayerParasiteTimeRemaining()
+
+    local player = Client.GetLocalPlayer()
+    if player and HasMixin(player, "ParasiteAble") then
+        return player:GetParasitePercentageRemaining()
+    end
+
+    return false
+
+end
+
 function PlayerUI_GetPlayerJetpackFuel()
 
     local player = Client.GetLocalPlayer()
@@ -1557,13 +1704,88 @@ end
 function PlayerUI_GetIsNanoShielded()
 
     local player = Client.GetLocalPlayer()
-    
+
     if player and HasMixin(player, "NanoShieldAble") then
-        
         return player:GetIsNanoShielded()
-    
     end
-    
+
+    return false
+
+end
+
+function PlayerUI_GetNanoShieldTimeRemaining()
+
+    local player = Client.GetLocalPlayer()
+    if player and HasMixin(player, "NanoShieldAble") then
+        return player:GetNanoShieldTimeRemaining()
+    end
+
+    return false
+
+end
+
+function PlayerUI_GetPlayerNanoShieldState()
+
+    local playerNanoshieldState = 1
+    if PlayerUI_GetIsNanoShielded() then
+        playerNanoshieldState = 2
+    end
+
+    return playerNanoshieldState
+
+end
+
+function PlayerUI_GetIsCatPacked()
+
+    local player = Client.GetLocalPlayer()
+    if player and HasMixin(player, "CatPack") then
+        return player:GetHasCatPackBoost()
+    end
+
+    return false
+
+end
+
+function PlayerUI_GetIsCorroded()
+
+    local player = Client.GetLocalPlayer()
+    if player and HasMixin(player, "Corrode") then
+        return player:GetIsCorroded()
+    end
+
+    return false
+
+end
+
+function PlayerUI_GetCatPackTimeRemaining()
+
+    local player = Client.GetLocalPlayer()
+    if player and HasMixin(player, "CatPack") then
+        return player:GetCatPackTimeRemaining()
+    end
+
+    return false
+
+end
+
+function PlayerUI_GetPlayerCatPackState()
+
+    local playerCatPackState = 1
+    if PlayerUI_GetIsCatPacked() then
+        playerCatPackState = 2
+    end
+
+    return playerCatPackState
+
+end
+
+function PlayerUI_GetHasUmbra()
+
+    local player = Client.GetLocalPlayer()
+    if player and HasMixin(player, "Umbra") then
+        return player.umbraIntensity > 0
+    end
+
     return false
 
 end
@@ -1596,6 +1818,7 @@ function PlayerUI_GetPlayerParasiteState()
     return playerParasiteState
 
 end
+
 function PlayerUI_GetIsBeaconing()
 
     local player = Client.GetLocalPlayer()
@@ -1605,6 +1828,40 @@ function PlayerUI_GetIsBeaconing()
     return false
 
 end
+
+function PlayerUI_GetIsDetected()
+
+    local player = Client.GetLocalPlayer()
+    if player and HasMixin(player, "Detectable")  then
+        return player:GetIsDetected()
+    end
+
+    return false
+
+end
+
+function PlayerUI_GetIsEnzymed()
+
+    local player = Client.GetLocalPlayer()
+    if player and player:isa("Alien") then
+        return player:GetIsEnzymed()
+    end
+
+    return false
+
+end
+
+function PlayerUI_GetIsCloaked()
+
+    local player = Client.GetLocalPlayer()
+    if player and HasMixin(player, "Cloakable") then
+        return player:GetCloakFraction() > 0
+    end
+
+    return false
+
+end
+
 
 function PlayerUI_GetPlayerOnInfestation()
 
@@ -1675,6 +1932,18 @@ function PlayerUI_GetNumClingedBabblers()
 
 end
 
+function PlayerUI_GetNumBabblers()
+
+    local numBabblers = 0
+    local player = Client.GetLocalPlayer()
+    if player and HasMixin(player, "BabblerOwner") then
+        numBabblers = player:GetBabblerCount()
+    end
+
+    return numBabblers
+
+end
+
 function PlayerUI_GetEnergizeLevel()
 
     local energizeLevel = 0
@@ -1697,19 +1966,22 @@ function Player:GetDrawResourceDisplay()
 end
 
 function Player:GetShowHealthFor(player)
+    -- if they recently damaged you...
+    if Client then
+        if player:GetIsLocalPlayer() then
+            if player:GetHasMarkedTarget( self ) then
+                return true
+            end
+        end
+    end
+
     return ( player:isa("Spectator") or ( not GetAreEnemies(self, player) and self:GetIsAlive() ) ) and self:GetTeamType() ~= kNeutralTeamType
 end
 
 function Player:GetCrossHairTarget()
 
-    local viewAngles = self:GetViewAngles()    
-    local viewCoords = viewAngles:GetCoords()    
-    local startPoint = self:GetEyePos()
-    local endPoint = startPoint + viewCoords.zAxis * Player.kRangeFinderDistance
-    
-    local trace = Shared.TraceRay(startPoint, endPoint, CollisionRep.Damage, PhysicsMask.AllButPCsAndRagdolls, EntityFilterOneAndIsa(self, "Babbler"))
-    return trace.entity
-    
+    return self:GetCachedCrossHairTarget()
+
 end
 
 function Player:GetShowCrossHairText()
@@ -1803,11 +2075,11 @@ end
 --Updates visibilty, status and position of health circle when aiming at an entity with live mixin
 function Player:UpdateCrossHairTarget()
  
-    --local entity = self:GetCrossHairTarget()
-    
-    if GetShowHealthRings() == false then
-        entity = nil
-    end    
+    local entity -- = self:GetCrossHairTarget()
+    --
+    -- if GetShowHealthRings() == false then
+    --     entity = nil
+    -- end  
     
     self:UpdateCrossHairText(entity)
     
@@ -1823,6 +2095,11 @@ end
 function Player:GetIsMinimapVisible()
     return self.minimapVisible or false
 end
+
+function Player:SetIsMinimapVisible(visible)
+    self.minimapVisible = visible
+end
+
 
 local function Player_CanThrowObject( self )
 
@@ -1860,6 +2137,9 @@ local function Player_CanThrowObject( self )
     return true
 end
 
+function Player:GetCommHealthBarsShown()
+    return false
+end
 
 --[[
  * Use only client side (for bringing up menus for example). Key events, and their consequences, are not sent to the server.
@@ -1892,6 +2172,12 @@ function Player:SendKeyEvent(key, down)
         
             if GetIsBinding(key, "ReadyRoom") then
                 Shared.ConsoleCommand("rr")
+            elseif GetIsBinding(key, "JoinMarines") then
+                Shared.ConsoleCommand("j1")
+            elseif GetIsBinding(key, "JoinAliens") then
+                Shared.ConsoleCommand("j2")
+            elseif GetIsBinding(key, "JoinSpectate") then
+                Shared.ConsoleCommand("spectate")
             elseif GetIsBinding(key, "TextChat") and not self:isa("Commander") then
                 ChatUI_EnterChatMessage(false)
                 return true
@@ -1952,7 +2238,7 @@ end
 function Player:SetBlurEnabled(blurEnabled)
 
     if self:GetIsLocalPlayer() and Player.screenEffects.blur then
-        Player.screenEffects.blur:SetActive(blurEnabled)
+        Player.screenEffects.blur:SetActive(blurEnabled and Client.GetHudDetail() == kHUDMode.Full)
     end
     
 end
@@ -1981,13 +2267,13 @@ function Player:UpdateScreenEffects(deltaTime)
     if self:GetHealthScalar() <= kLowHealthWarning and not isSpectator and
        not isCommander and not isEmbryo and not isExo then
     
-        Player.screenEffects.lowHealth:SetActive(true)
-        local healthWeight = 1 - (self:GetHealthScalar() / kLowHealthWarning)
-        local pulseSpeed = kLowHealthPulseSpeed / 2 + (kLowHealthPulseSpeed / 2 * healthWeight)
-        local pulseScalar = (math.sin(Shared.GetTime() * pulseSpeed) + 1) / 2
-        healthWeight = 0.5 + (0.5 * (healthWeight * pulseScalar))
-        Player.screenEffects.lowHealth:SetParameter("healthWeight", healthWeight *.65)
-        
+          --Player.screenEffects.lowHealth:SetActive(true)
+        --local healthWeight = 1 - (self:GetHealthScalar() / kLowHealthWarning)
+        --local pulseSpeed = kLowHealthPulseSpeed / 2 + (kLowHealthPulseSpeed / 2 * healthWeight)
+        --local pulseScalar = (math.sin(Shared.GetTime() * pulseSpeed) + 1) / 2
+        --healthWeight = 0.5 + (0.5 * (healthWeight * pulseScalar))
+        --Player.screenEffects.lowHealth:SetParameter("healthWeight", healthWeight *.65)
+
     else
         Player.screenEffects.lowHealth:SetActive(false)
     end
@@ -2035,15 +2321,31 @@ function Player:UpdateScreenEffects(deltaTime)
 
         local effectActive = self.catpackboost == true and self.timeCatpackboost + kCatPackDuration > Shared.GetTime()
         Player.screenEffects.catalystVision:SetActive(effectActive)
-        
+
         if effectActive then
-        
+
             local amount = Clamp(1.0 - (( Shared.GetTime() - self.timeCatpackboost) / kCatPackDuration), 0, 1)
-        
+
             Player.screenEffects.catalystVision:SetParameter("amount", amount)
-            Player.screenEffects.catalystVision:SetParameter("time", Shared.GetTime())
+            --Player.screenEffects.catalystVision:SetParameter("time", Shared.GetTime()) -- unused
         end
-        
+
+    end
+
+    if Player.screenEffects.boneShieldVision then
+
+        local effectActive = self:isa("Onos") and self:GetIsBoneShieldActive()
+        Player.screenEffects.boneShieldVision:SetActive(effectActive)
+
+        if effectActive then
+            local activeWeapon = self:GetActiveWeapon()
+            assert( activeWeapon and activeWeapon:isa("BoneShield") and activeWeapon.primaryAttacking ) -- should be true, since this is in GetIsBoneShieldActive
+            
+            --Player.screenEffects.boneShieldVision:SetParameter("amount", 0.4 ) --TODO Replace with something better (slerp of energy?) 
+            -- currently not in use
+            --Player.screenEffects.boneShieldVision:SetParameter("time", Shared.GetTime() )
+        end
+
     end
     
     if Player.screenEffects.fadeBlink and self:isa("Fade") and not self:GetIsThirdPerson() then
@@ -2093,7 +2395,7 @@ function Player:UpdateShadowStepFX()
 end
 
 function Player:GetDrawWorld(isLocal)
-    return not self:GetIsLocalPlayer() or self:GetIsThirdPerson() or ((self.countingDown and not Shared.GetCheatsEnabled()) and self:GetTeamNumber() ~= kNeutralTeamType)
+    return not self:GetIsLocalPlayer() or self:GetIsThirdPerson() or (((self.concedeSequence or self:GetCountdownActive()) and not Shared.GetCheatsEnabled()) and self:GetTeamNumber() ~= kNeutralTeamType)
 end
 
 -- Only called when not running prediction
@@ -2265,50 +2567,29 @@ function Player:OnInitLocalClient()
     
     -- Re-enable skybox rendering after commanding
     SetSkyboxDrawState(true)
-    
+
     -- Show props normally
     SetCommanderPropState(false)
-    
+
     -- Assume not in overhead mode.
     SetLocalPlayerIsOverhead(false)
-    
+
     -- Turn on sound occlusion for non-commanders
     Client.SetSoundGeometryEnabled(true)
-    
+
     self.traceReticle = false
-    
+
     self.damageIndicators = { }
-    
-    -- Set commander geometry visible
-    Client.SetGroupIsVisible(kCommanderInvisibleGroupName, true)
-    
+
     --Client.SetEnableFog(true)
     self.crossHairText = nil
     self.crossHairTextColor = kFriendlyColor
-    
+
     -- reset mouse sens in case it hase been forgotten somewhere else
     Client.SetMouseSensitivityScalar(1)
-    
-end
 
-function Player:OnVortexClient()
+    Player.kShowGiveDamageTime = GetAdvancedOption("hitindicator")
 
-    if self:GetIsLocalPlayer() then
-    
-        StartSoundEffectForPlayer(kVortexed2DStart, self)
-
-    end
-    
-end
-
-function Player:OnVortexEndClient()
-
-    if self:GetIsLocalPlayer() then
-    
-        StartSoundEffectForPlayer(kVortexed2DEnd, self)
-
-    end
-    
 end
 
 function Player:SetCloakShaderState(state)
@@ -2479,10 +2760,13 @@ end
 function Player:ShowMap(showMap, showBig, forceReset)
 
     self.minimapVisible = showMap and showBig
-    
-    ClientUI.GetScript("GUIMinimapFrame"):ShowMap(showMap)
-    ClientUI.GetScript("GUIMinimapFrame"):SetBackgroundMode((showBig and GUIMinimapFrame.kModeBig) or GUIMinimapFrame.kModeMini, forceReset)
-    
+
+    local minimapFrameScript = ClientUI.GetScript("GUIMinimapFrame")
+    if minimapFrameScript then
+        minimapFrameScript:ShowMap(showMap)
+        minimapFrameScript:SetBackgroundMode((showBig and GUIMinimapFrame.kModeBig) or GUIMinimapFrame.kModeMini, forceReset)
+    end
+
 end
 
 function Player:GetWeaponAmmo()
@@ -2544,7 +2828,7 @@ function Player:GetHeadAttachpointName()
 end
 
 function Player:GetCameraViewCoordsOverride(cameraCoords)
-
+    
     local initialAngles = Angles()
     initialAngles:BuildFromCoords(cameraCoords)
 
@@ -2559,49 +2843,50 @@ function Player:GetCameraViewCoordsOverride(cameraCoords)
         
         cameraCoords.yAxis = GetNormalizedVector(cameraCoords.yAxis + attachCoords.yAxis * animationIntensity)
         cameraCoords.xAxis = cameraCoords.yAxis:CrossProduct(cameraCoords.zAxis)
-        cameraCoords.zAxis = cameraCoords.xAxis:CrossProduct(cameraCoords.yAxis)        
-        
+        cameraCoords.zAxis = cameraCoords.xAxis:CrossProduct(cameraCoords.yAxis)
+
         cameraCoords.origin.x = cameraCoords.origin.x + (attachCoords.origin.x - cameraCoords.origin.x) * movementIntensity
         cameraCoords.origin.y = attachCoords.origin.y
         cameraCoords.origin.z = cameraCoords.origin.z + (attachCoords.origin.z - cameraCoords.origin.z) * movementIntensity
         
+        Client.SetMouseSensitivityScalar(0) -- Don't let player look around when dead.
+        
         return cameraCoords
-    
+
     end
 
-    if self.countingDown and not Shared.GetCheatsEnabled() then
-    
+    if self:GetCountdownActive() and not Shared.GetCheatsEnabled() then
+
         if HasMixin(self, "Team") and (self:GetTeamNumber() == kMarineTeamType or self:GetTeamNumber() == kAlienTeamType) then
             cameraCoords = self:GetCameraViewCoordsCountdown(cameraCoords)
-            Client.SetYaw(self.viewYaw)
+            Client.SetYaw(self.viewYaw - self.baseYaw)
             Client.SetPitch(self.viewPitch)
             continue = false
         end
-        
+
         if not self.clientCountingDown then
 
-            self.clientCountingDown = true    
+            self.clientCountingDown = true
             if self.OnCountDown then
                 self:OnCountDown()
-            end  
-  
+            end
+
         end
-        
+
     end
-        
+
     if continue then
-    
-         if self.clientCountingDown then
+
+        if self.clientCountingDown then
             self.clientCountingDown = false
-            
+
             if self.OnCountDownEnd then
                 self:OnCountDownEnd()
-            end 
+            end
         end
-        
+
         local activeWeapon = self:GetActiveWeapon()
-        local animateCamera = activeWeapon and (not activeWeapon.GetPreventCameraAnimation or not activeWeapon:GetPreventCameraAnimation(self))
-    
+        
         -- clamp the yaw value to prevent sudden camera flip
         local cameraAngles = Angles()
         cameraAngles:BuildFromCoords(cameraCoords)
@@ -2609,65 +2894,41 @@ function Player:GetCameraViewCoordsOverride(cameraCoords)
 
         cameraCoords = cameraAngles:GetCoords(cameraCoords.origin)
 
-        -- Add in camera movement from view model animation
-        if self:GetCameraDistance() == 0 then    
-        
-            local viewModel = self:GetViewModelEntity()
-            if viewModel and animateCamera then
-            
-                local success, viewModelCameraCoords = viewModel:GetCameraCoords()
-                if success then
-                
-                    -- If the view model coords has scaling in it that can affect
-                    -- our later calculations, so remove it.
-                    viewModelCameraCoords.xAxis:Normalize()
-                    viewModelCameraCoords.yAxis:Normalize()
-                    viewModelCameraCoords.zAxis:Normalize()
-
-                    cameraCoords = cameraCoords * viewModelCameraCoords
-                    
-                end
-                
-            end
-        
-        end
-
         -- Allow weapon or ability to override camera (needed for Blink)
         if activeWeapon then
-        
+
             local override, newCoords = activeWeapon:GetCameraCoords()
-            
+
             if override then
                 cameraCoords = newCoords
             end
-            
+
         end
 
         -- Add in camera shake effect if any
         if(Shared.GetTime() < self.cameraShakeTime) then
-        
+
             -- Camera shake knocks view up and down a bit
             local shakeAmount = math.sin( Shared.GetTime() * self.cameraShakeSpeed * 2 * math.pi ) * self.cameraShakeAmount
             local origin = Vector(cameraCoords.origin)
             
-            --cameraCoords.origin = cameraCoords.origin + self.shakeVec*shakeAmount
             local yaw = GetYawFromVector(cameraCoords.zAxis)
             local pitch = GetPitchFromVector(cameraCoords.zAxis) + shakeAmount
-            
+
             local angles = Angles(Clamp(pitch, -kMaxPitch, kMaxPitch), yaw, 0)
             cameraCoords = angles:GetCoords(origin)
-            
+
         end
-        
+
         cameraCoords = self:PlayerCameraCoordsAdjustment(cameraCoords)
-    
+
     end
 
     local resultingAngles = Angles()
     resultingAngles:BuildFromCoords(cameraCoords)
     --[[
     local fovScale = 1
-    
+
     if self:GetNumModelCameras() > 0 then
         local camera = self:GetModelCamera(0)
         fovScale = camera:GetFov() / math.rad(self:GetFov())
@@ -2677,9 +2938,9 @@ function Player:GetCameraViewCoordsOverride(cameraCoords)
 
     self.pitchDiff = GetAnglesDifference(resultingAngles.pitch, initialAngles.pitch) * fovScale
     ]]
-  
+
     return cameraCoords
-    
+
 end
 
 function Player:GetCountDownFraction()
@@ -2705,92 +2966,88 @@ end
 function Player:GetCountDownCamerStartCoords()
 
     local coords
-    
+
     -- find the closest command structure and a random start position, look at it at start
     local commandStructures = GetEntitiesForTeam("CommandStructure", self:GetTeamNumber())
     
+    local randomSpawnOrigin = self:GetOrigin()
     if #commandStructures > 0 then
-    
-        local extents = LookupTechData(kTechDataMaxExtents, self:GetTechId(), Vector(Player.kXZExtents, Player.kYExtents, Player.kXZExtents))
-        local randomSpawn = GetRandomSpawnForCapsule(extents.y, extents.x, commandStructures[1]:GetOrigin(), 4, 7, EntityFilterAll())
-    
-        if randomSpawn then
-        
-            randomSpawn = randomSpawn + Vector(0, 2, 0)
-            local directionToPlayer = self:GetEyePos() - randomSpawn  
-            directionToPlayer.y = 0
-            directionToPlayer:Normalize()  
-            coords =  Coords.GetLookIn(randomSpawn, directionToPlayer)
-            
-        end    
-
+        randomSpawnOrigin = commandStructures[1]:GetOrigin()
     end
     
+    local extents = LookupTechData(kTechDataMaxExtents, self:GetTechId(), Vector(Player.kXZExtents, Player.kYExtents, Player.kXZExtents))
+    local randomSpawn = GetRandomSpawnForCapsule(extents.y, extents.x, randomSpawnOrigin, 4, 7, EntityFilterAll())
+    
+    -- GetRandomSpawnForCapsule() can sometimes return nil...
+    if randomSpawn then
+        randomSpawn = randomSpawn + Vector(0, 2, 0)
+    else
+        -- Fall back and just use a random offset from the player.
+        randomSpawn = self:GetEyePos() + GetRandomDirXZ()
+    end
+    
+    local directionToPlayer = self:GetEyePos() - randomSpawn
+    directionToPlayer.y = 0
+    directionToPlayer:Normalize()
+    coords = Coords.GetLookIn(randomSpawn, directionToPlayer)
+
     return coords
 
-end  
+end
 
 function Player:OnCountDown()
 
     if not Shared.GetCheatsEnabled() then
-    
-        if not self.guiCountDownDisplay and HasMixin(self, "Team") and (self:GetTeamNumber() == kMarineTeamType or self:GetTeamNumber() == kAlienTeamType) then
-            self.guiCountDownDisplay = GetGUIManager():CreateGUIScript("GUICountDownDisplay")
-        end
-        
+
+        Client.PlayMusic("sound/NS2.fev/round_start")
+
     end
-	
-	Client.WindowNeedsAttention() -- the game is starting!
+
+    Client.WindowNeedsAttention() -- the game is starting!
 
 end
 
 function Player:OnCountDownEnd()
 
-    if self.guiCountDownDisplay then
-    
-        GetGUIManager():DestroyGUIScript(self.guiCountDownDisplay)
-        self.guiCountDownDisplay = nil
-        
-    end
-    
-    Client.PlayMusic(gRoundStartMusic or "sound/NS2.fev/round_start")
-    
+    --Client.PlayMusic("sound/NS2.fev/round_start") --gRoundStartMusic  using gRoundStartMusic prevents playback
+
+    --reset feedbackSend
+    Client.feedbackSend = nil
 end
 
 function Player:GetCameraViewCoordsCountdown(cameraCoords)
 
     if not Shared.GetCheatsEnabled() then
     
-        if not self.countDownStartCameraCoords then
-            self.countDownStartCameraCoords = self:GetCountDownCamerStartCoords()
+        if not self.countdownStartAngles then
+            local startCoords = self:GetCountDownCamerStartCoords()
+            self.countdownStartAngles = Angles()
+            self.countdownStartAngles:BuildFromCoords(startCoords)
+            self.countdownStartOrigin = startCoords.origin
         end
+    
+        if self.countdownStartAngles then
+            
+            local endAngles = self:GetViewAngles()
+            local endOrigin = self:GetEyePos()
+            
+            local animFrac = self:GetCountDownFraction()
         
-        if not self.countDownEndCameraCoords then
-            self.countDownEndCameraCoords = self:GetViewCoords()
+            local angleFrac = 1.0 - math.cos(animFrac * 0.5 * math.pi)
+            local originFrac = angleFrac
+        
+            -- give a little bit more acceleration to the angles.
+            angleFrac = 1.0 - math.cos(angleFrac * 0.5 * math.pi)
+        
+            local lerpAngles = Angles.Lerp(self.countdownStartAngles, endAngles, angleFrac)
+            local originDiff = endOrigin - self.countdownStartOrigin
+            local lerpOrigin = self.countdownStartOrigin + originDiff * originFrac
+        
+            cameraCoords = lerpAngles:GetCoords()
+            cameraCoords.origin = lerpOrigin
+            
         end
 
-        if self.countDownStartCameraCoords then
-        
-            local originDiff = self.countDownEndCameraCoords.origin - self.countDownStartCameraCoords.origin        
-            local zAxisDiff = self.countDownEndCameraCoords.zAxis - self.countDownStartCameraCoords.zAxis
-            zAxisDiff.y = 0
-            local animationFraction = self:GetCountDownFraction()
-            
-            --local viewDirection = self.countDownStartCameraCoords.zAxis + zAxisDiff * animationFraction
-            local viewDirection = self.countDownStartCameraCoords.zAxis + zAxisDiff * ( math.cos((animationFraction * (math.pi / 2)) + math.pi ) + 1)
-
-            viewDirection:Normalize()
-            
-            cameraCoords = Coords.GetLookIn(self.countDownStartCameraCoords.origin + originDiff * animationFraction, viewDirection)
-            
-            -- correct the yAxis to prevent camera flipping
-            if cameraCoords.yAxis:DotProduct(Vector(0, 1, 0)) < 0 then
-                cameraCoords.yAxis = cameraCoords.zAxis:CrossProduct(-cameraCoords.xAxis)
-                cameraCoords.xAxis = viewDirection:CrossProduct(cameraCoords.yAxis)
-            end
-            
-        end
-        
     end
 
     return cameraCoords
@@ -2895,16 +3152,10 @@ end
 -- fetch the oldest notification
 function PlayerUI_GetRecentNotification()
 
-    if gDebugNotifications then
-        if math.random() < 0.2 then
-            return { LocationName = "Test Location" , TechId = math.random(1, 80) }
-        end
-    end
-
     local notification
     
     local player = Client.GetLocalPlayer()
-    if player and player.GetAndClearNotification then
+    if HasMixin(player, "GUINotification") and player:GetDelayTimePassed() then
         notification = player:GetAndClearNotification()
     end
 
@@ -2921,14 +3172,14 @@ local kGrenades =
 function PlayerUI_GetIsTechMapVisible()
 
     local script = ClientUI.GetScript("GUITechMap")
-    return script ~= nil and script:GetIsVisible()
+    return script ~= nil and script:GetIsDisplayed()
 
 end
 
 function PlayerUI_GetHasItem(techId)
 
     local hasItem = false
-    local isaGrenade = table.contains(kGrenades, techId)
+    local isaGrenade = table.icontains(kGrenades, techId)
 
     if techId and techId ~= kTechId.None then
     
@@ -2944,7 +3195,7 @@ function PlayerUI_GetHasItem(techId)
                     hasItem = true
                     break
                     
-                elseif isaGrenade and table.contains(kGrenades, item:GetTechId()) then
+                elseif isaGrenade and table.icontains(kGrenades, item:GetTechId()) then
                 
                     hasItem = true
                     break
@@ -2967,7 +3218,7 @@ function PlayerUI_GetRecentPurchaseable()
     local player = Client.GetLocalPlayer()
     if player ~= nil then
         local teamInfo = GetEntitiesForTeam("TeamInfo", player:GetTeamNumber())
-        if table.count(teamInfo) > 0 then
+        if table.icount(teamInfo) > 0 then
         
             local newTechId = teamInfo[1]:GetLatestResearchedTech()
             local playSound = newTechId ~= gPreviousTechId
@@ -2983,6 +3234,14 @@ end
 
 -- returns 0 - 3
 function PlayerUI_GetArmorLevel(researched)
+
+    local gameInfoEnt = GetGameInfoEntity()
+    assert(gameInfoEnt)
+
+    if gameInfoEnt:GetWarmUpActive() then
+        return 3
+    end
+
     local armorLevel = 1
     
     
@@ -3028,6 +3287,13 @@ end
 
 function PlayerUI_GetWeaponLevel(researched)
     local weaponLevel = 1
+
+    local gameInfoEnt = GetGameInfoEntity()
+    assert(gameInfoEnt)
+
+    if gameInfoEnt:GetWarmUpActive() then
+        return 3
+    end
     
     if Client.GetLocalPlayer().gameBuytime or Client.GetLocalPlayer().gameStarted then
     
@@ -3467,6 +3733,20 @@ function PlayerUI_GetMapXY(worldX, worldZ)
 
 end
 
+--[[
+    These voice chat offset functions are for letting the GUIVoiceChat script know how much further it should
+    move over due to some other gui element on the screen. Right now its just used for GUILifeformPopup since that would
+    overlap the GUIVoice chat bars.
+]]--
+local kLifeformPopupActive = false
+function PlayerUI_GetLifeformPopupActive()
+    return kLifeformPopupActive
+end
+
+function PlayerUI_SetLifeformPopupActive(active)
+    kLifeformPopupActive = active
+end
+
 --[[ Dead code, remove /matso
  * Returns a linear array of static blip data
  * X position, Y position, rotation, X texture offset, Y texture offset, kMinimapBlipType, kMinimapBlipTeam
@@ -3651,38 +3931,7 @@ function PlayerUI_GetStaticMapBlips()
             end
         
         end
-        
-        if player:isa("Fade") then
-        
-            local vortexAbility = player:GetWeapon(Vortex.kMapName)
-            if vortexAbility then
-            
-                local gate = vortexAbility:GetEtherealGate()
-                if gate then
-                
-                    local i = numBlips * 10
-                
-                    local blipOrig = gate:GetOrigin()
-                
-                    blipsData[i + 1] = blipOrig.x
-                    blipsData[i + 2] = blipOrig.z
-                    blipsData[i + 3] = 0
-                    blipsData[i + 4] = 0
-                    blipsData[i + 5] = 0
-                    blipsData[i + 6] = kMinimapBlipType.EtherealGate
-                    blipsData[i + 7] = kMinimapBlipTeam.Friendly
-                    blipsData[i + 8] = false
-                    blipsData[i + 9] = false
-                    blipsData[i + 10] = false
-                    
-                    numBlips = numBlips + 1
-                    
-                end
-            
-            end
-        
-        end
-        
+               
         local highlightPos = GetHighlightPosition()
         if highlightPos then
 
@@ -3790,8 +4039,9 @@ function PlayerUI_GetShowGiveDamageIndicator()
     if player and player.GetDamageIndicatorTime and player:GetIsPlaying() then
     
         local timePassed = Shared.GetTime() - player:GetDamageIndicatorTime()
-        return timePassed <= Player.kShowGiveDamageTime, math.min(timePassed / Player.kShowGiveDamageTime, 1)
-        
+        local opacity = math.min(timePassed / Player.kShowGiveDamageTime, 1)
+        return timePassed <= Player.kShowGiveDamageTime, opacity * opacity
+
     end
     
     return false, 0
@@ -3857,7 +4107,11 @@ end
 local function GetDamageEffectType(self)
 
     if self:isa("Marine") then
-        return kDamageEffectType.Blood
+        if self.marineType == kMarineVariantsBaseType.bigmac then
+            return kDamageEffectType.Oil
+        else
+            return kDamageEffectType.Blood
+        end
     elseif self:isa("Alien") then
         return kDamageEffectType.AlienBlood
     elseif self:isa("Exo") then
@@ -3870,59 +4124,51 @@ function Player:GetShowDamageArrows()
     return true
 end
 
-local function TriggerFirstPersonDeathEffects(self)
-
-    local cinematic = Client.CreateCinematic(RenderScene.Zone_ViewModel)
-    cinematic:SetCinematic(self:GetFirstPersonDeathEffect())
-    
-end
 
 function Player:AddTakeDamageIndicator(damagePosition)
 
-    if self:GetShowDamageArrows() then
+    if self:GetShowDamageArrows() and self.damageIndicators then
         table.insert(self.damageIndicators, { damagePosition.x, damagePosition.z, Shared.GetTime() })
     end
-    
-    if not self:GetIsAlive() and not self.deathTriggered then
-    
-        TriggerFirstPersonDeathEffects(self)
-        self.deathTriggered = true
-        
-    end
-    
+
     local damageIndicatorScript = ClientUI.GetScript("GUIDamageIndicators")
     local hitEffectType = GetDamageEffectType(self)
-    
+
     if damageIndicatorScript and hitEffectType then
-    
+
         local position = Vector(0, 0, 0)
         local viewCoords = self:GetViewCoords()
-        
+
         local hitDirection = GetNormalizedVector( viewCoords.origin - damagePosition )
         position.x = viewCoords.xAxis:DotProduct(hitDirection)
         position.y = viewCoords.zAxis:DotProduct(hitDirection)
-        
+
         if position:GetLength() > 0 then
-        
+
             position:Normalize()
-            position:Scale(0.95)
-            
-            local screenPos = Vector()
-            
-            screenPos.y = position.y * Client.GetScreenHeight() *.5 + Client.GetScreenHeight() *.5
-            screenPos.x = position.x * Client.GetScreenWidth() * .5 + Client.GetScreenWidth() * .5
-            
+            local swh, shh = Client.GetScreenWidth() * 0.5, Client.GetScreenHeight() * 0.5
+
+            -- find intersection time with screen edge
+            local angle = math.atan2( position.y, position.x )
+            local t1 = math.abs( swh / math.cos(angle) ) -- intersection time with left and right edge
+            local t2 = math.abs( shh / math.sin(angle) ) -- intersection time with bottom and top edge
+
+            -- calculate blood splatter origin
+            local t = math.min( t1, t2 ) - GUIDamageIndicators.kDamageIndicatorOffset
+            local screenPos = Vector( swh, shh, 0 ) + position * t
+
+            -- find rotation for blood splatter (needs to point towards the center)
             local rotation = math.atan2(position.x, position.y) + .5 * math.pi
             if rotation < 0 then
                 rotation = rotation + 2 * math.pi
             end
-            
+
             damageIndicatorScript:OnTakeDamage(screenPos, rotation, hitEffectType)
-        
+
         end
-        
+
     end
-    
+
 end
 
 -- child classes can override this
@@ -3943,35 +4189,35 @@ end
 function Player:UpdateDamageIndicators()
 
     local indicesToRemove = {}
-    
+
     -- Expire old damage indicators
     for index, indicatorTriple in ipairs(self.damageIndicators) do
-    
+
         if Shared.GetTime() > (indicatorTriple[3] + Player.kDamageIndicatorDrawTime) then
-        
+
             table.insert(indicesToRemove, index)
-            
+
         end
-        
+
     end
-    
+
     for i, index in ipairs(indicesToRemove) do
         table.remove(self.damageIndicators, index)
     end
-    
+
     -- update damage given
     if self.giveDamageTimeClientCheck ~= self.giveDamageTime then
-    
+
         self.giveDamageTimeClientCheck = self.giveDamageTime
-        -- Must factor in ping time as this value is delayed.
-        self.giveDamageTimeClient = self.giveDamageTime + Client.GetPing()
+        self.giveDamageTimeClient = Shared.GetTime()
+
         self.showDamage = self:GetShowDamageIndicator()
         if self.showDamage then
             self:OnGiveDamage()
         end
-        
+
     end
-    
+
 end
 
     
@@ -4046,8 +4292,11 @@ function Player:UpdateCommunicationStatus()
             local newCommStatus = kPlayerCommunicationStatus.None
 
             -- If voice comm being used
-            if Client.GetVoiceChannelForRecording() ~= VoiceChannel.Invalid then
-                newCommStatus = kPlayerCommunicationStatus.Voice
+            if Client.GetVoiceChannelForRecording() ~= VoiceChannel.Invalid
+                and Client.GetOptionInteger( "voiceVolume", 90 ) > 0
+                and Client.GetOptionFloat("recordingGain", 0.5) > 0
+                then
+                    newCommStatus = kPlayerCommunicationStatus.Voice
             -- If we're typing
             elseif ChatUI_EnteringChatMessage() then
                 newCommStatus = kPlayerCommunicationStatus.Typing
@@ -4084,20 +4333,20 @@ end
 function Player:OnUpdateRender()
 
     PROFILE("Player:OnUpdateRender")
-    
+
     if self:GetIsLocalPlayer() then
-    
+
         local stunned = HasMixin(self, "Stun") and self:GetIsStunned()
-        local blurEnabled = self.buyMenu ~= nil or stunned
+        local blurEnabled = self.buyMenu ~= nil or stunned or (self.viewingHelpScreen == true)
         self:SetBlurEnabled(blurEnabled)
-        
+
         self.lastOnUpdateRenderTime = self.lastOnUpdateRenderTime or Shared.GetTime()
         local now = Shared.GetTime()
         self:UpdateScreenEffects(now - self.lastOnUpdateRenderTime)
         self.lastOnUpdateRenderTime = now
-        
+
     end
-    
+
 end
 
 function Player:GetCustomSelectionText()
@@ -4165,3 +4414,5 @@ end
 function Player:GetShowAtmosphericLight()
     return true
 end
+
+

@@ -6,12 +6,151 @@
 --
 --  NS2-specific utility functions.
 --
---  ========= For more information, visit us at http://www.unknownworlds.com =====================
+--  ========= For more information, visit us at http:--www.unknownworlds.com =====================
 
 Script.Load("lua/Table.lua")
 Script.Load("lua/Utility.lua")
+Script.Load("lua/UnorderedSet.lua")
 
 local kInfestationDecalSimpleMaterial = PrecacheAsset("materials/infestation/infestation_decal_simple.material")
+
+function FormatDateTimeString(dateTime)
+    local tmpDate = os.date("*t", dateTime)
+    local ordinal = "th"
+
+    local lastDig = tmpDate.day % 10
+    if (tmpDate.day < 11 or tmpDate.day > 13) and lastDig > 0 and lastDig < 4 then
+        if lastDig == 1 then
+            ordinal = "st"
+        elseif lastDig == 2 then
+            ordinal = "nd"
+        else
+            ordinal = "rd"
+        end
+    end
+
+    return string.format("%s%s, %d @ %d:%02d", os.date("%A, %B %d", dateTime), ordinal, tmpDate.year, tmpDate.hour, tmpDate.min)
+end
+
+function PlayerUI_GetGameTimeString()
+
+    local gameTime, state = PlayerUI_GetGameLengthTime()
+    if state < kGameState.PreGame then
+        gameTime = 0
+    end
+
+    local minutes = math.floor(gameTime / 60)
+    local seconds = math.floor(gameTime % 60)
+
+    return (string.format("%d:%.2d", minutes, seconds))
+
+end
+
+function GetWeaponReserveAmmoFraction(weapon)
+    local fraction = -1
+    if weapon and weapon:isa("Weapon") then
+        if weapon:isa("ClipWeapon") then
+            fraction = weapon:GetAmmo()/weapon:GetMaxAmmo()
+        end
+    end
+
+    return fraction
+end
+
+function GetWeaponAmmoFraction(weapon)
+    local fraction = -1
+    if weapon and weapon:isa("Weapon") then
+        if weapon:isa("ClipWeapon") then
+            fraction = weapon:GetClip()/weapon:GetClipSize()
+        elseif weapon:isa("GrenadeThrower") then
+            fraction = weapon.grenadesLeft/kMaxHandGrenades
+        elseif weapon:isa("LayMines") then
+            fraction = weapon:GetMinesLeft()/kNumMines
+        elseif weapon:isa("ExoWeaponHolder") then
+            local leftWeapon = Shared.GetEntity(weapon.leftWeaponId)
+            local rightWeapon = Shared.GetEntity(weapon.rightWeaponId)
+
+            if rightWeapon:isa("Railgun") then
+                fraction = rightWeapon:GetChargeAmount()
+                if leftWeapon:isa("Railgun") then
+                    fraction = (fraction + leftWeapon:GetChargeAmount()) / 2.0
+                end
+            elseif rightWeapon:isa("Minigun") then
+                fraction = rightWeapon.heatAmount
+                if leftWeapon:isa("Minigun") then
+                    fraction = (fraction + leftWeapon.heatAmount) / 2.0
+                end
+                fraction = 1 - fraction
+            end
+        elseif weapon:isa("Builder") or weapon:isa("Welder") then
+            fraction = PlayerUI_GetUnitStatusPercentage()/100
+        end
+    end
+
+    return fraction
+end
+
+function GetWeaponReserveAmmoString(weapon)
+    local ammo = ""
+    if weapon and weapon:isa("Weapon") then
+        if weapon:isa("ClipWeapon") then
+            ammo = string.format("%d", weapon:GetAmmo() or 0)
+        end
+    end
+
+    return ammo
+end
+
+function GetWeaponAmmoString(weapon)
+    local ammo = ""
+    if weapon and weapon:isa("Weapon") then
+        if weapon:isa("ClipWeapon") then
+            ammo = string.format("%d", weapon:GetClip() or 0)
+        elseif weapon:isa("GrenadeThrower") then
+            ammo = string.format("%d", weapon.grenadesLeft or 0)
+        elseif weapon:isa("LayMines") then
+            ammo = string.format("%d", weapon:GetMinesLeft() or 0)
+        elseif weapon:isa("ExoWeaponHolder") then
+            local leftWeapon = Shared.GetEntity(weapon.leftWeaponId)
+            local rightWeapon = Shared.GetEntity(weapon.rightWeaponId)
+            local leftAmmo = -1
+            local rightAmmo = -1
+            if rightWeapon:isa("Railgun") then
+                rightAmmo = rightWeapon:GetChargeAmount() * 100
+                if leftWeapon:isa("Railgun") then
+                    leftAmmo = leftWeapon:GetChargeAmount() * 100
+                end
+            elseif rightWeapon:isa("Minigun") then
+                rightAmmo = rightWeapon.heatAmount * 100
+                if leftWeapon:isa("Minigun") then
+                    leftAmmo = leftWeapon.heatAmount * 100
+                end
+            end
+            if leftAmmo > -1 and rightAmmo > -1 then
+                ammo = string.format("%d%% / %d%%", leftAmmo, rightAmmo)
+            elseif rightAmmo > -1 then
+                ammo = string.format("%d%%", rightAmmo)
+            end
+        elseif weapon:isa("Builder") or weapon:isa("Welder") and PlayerUI_GetUnitStatusPercentage() > 0 then
+            ammo = string.format("%d%%", PlayerUI_GetUnitStatusPercentage())
+        end
+    end
+
+    return ammo
+end
+
+function GetIsPointInsideClogs(point)
+
+    local clogs = GetEntitiesWithinRange("Clog", point, Clog.kRadius)
+    for i=1, #clogs do
+        if clogs[i] then
+            return true
+        end
+    end
+
+    return false
+
+end
 
 function GetHallucinationLifeTimeFraction(self)
 
@@ -26,16 +165,17 @@ function GetHallucinationLifeTimeFraction(self)
 end
 
 function GetTargetOrigin(target)
-    
-    local targetOrigin = target:GetOrigin()
-    if target.GetModelOrigin then
-        targetOrigin = target:GetModelOrigin()
-    end
+
     if target.GetEngagementPoint then
-        targetOrigin = target:GetEngagementPoint()
-    end    
-    return targetOrigin
-    
+        return target:GetEngagementPoint()
+    end
+
+    if target.GetModelOrigin then
+        return target:GetModelOrigin()
+    end
+
+    return target:GetOrigin()
+
 end
 
 function SelectAllHallucinations(player)
@@ -152,7 +292,7 @@ if Client then
 end
 
 function GetIsTechUseable(techId, teamNum)
-    //For  VIP mod, all tech is usable. Res only barrier
+    --For  VIP mod, all tech is usable. Res only barrier
     local useAble = true
     
     return useAble == true
@@ -328,7 +468,7 @@ end
 function GetTeamInfoEntity(teamNumber)
 
     local teamInfo = GetEntitiesForTeam("TeamInfo", teamNumber)
-    if table.count(teamInfo) > 0 then
+    if table.icount(teamInfo) > 0 then
         return teamInfo[1]
     end
     
@@ -343,21 +483,19 @@ function GetIsParasited(target)
 end
 
 function GetTeamHasCommander(teamNumber)
-
-    local gameInfoEntity = GetGameInfoEntity()
     local teamInfoEntity = GetTeamInfoEntity(teamNumber)
 
-    if gameInfoEntity and teamInfoEntity and gameInfoEntity:GetRookieMode() and teamInfoEntity:GetLastCommIsBot() then return false end
+    if teamInfoEntity and teamInfoEntity:GetLastCommIsBot() then return false end
 
     if Client then
-    
-        local commTable = ScoreboardUI_GetOrderedCommanderNames(teamNumber)
-        return #commTable > 0
-        
+
+        local commName = ScoreboardUI_GetCommanderName(teamNumber)
+        return commName ~= nil
+
     elseif Server then
         return #GetEntitiesForTeam("Commander", teamNumber) ~= 0
     end
-    
+
 end
 
 function GetIsCloseToMenuStructure(player)
@@ -404,17 +542,19 @@ function GetIsUnitActive(unit, debug)
     local alive = not HasMixin(unit, "Live") or unit:GetIsAlive()
     local isBuilt = not HasMixin(unit, "Construct") or unit:GetIsBuilt()
     local isRecycled = HasMixin(unit, "Recycle") and (unit:GetIsRecycled() or unit:GetIsRecycling())
-    
+    local isConsumed = HasMixin(unit, "Consume") and (unit:GetIsConsumed() or unit:GetIsConsuming())
+
     if debug then
         Print("------------ GetIsUnitActive(%s) -----------------", ToString(unit))
         Print("powered: %s", ToString(powered))
         Print("alive: %s", ToString(alive))
         Print("isBuilt: %s", ToString(isBuilt))
         Print("isRecycled: %s", ToString(isRecycled))
+        Print("isConsumed: %s", ToString(isConsumed))
         Print("-----------------------------")
     end
     
-    return not GetIsVortexed(unit) and powered and alive and isBuilt and not isRecycled
+    return powered and alive and isBuilt and not isRecycled and not isConsumed
     
 end
 
@@ -424,7 +564,7 @@ function GetIsUnderResourceTowerLimit(self)
     local harvesters = 0
     
     local teamInfo = GetEntitiesForTeam("TeamInfo", self:GetTeamNumber())        
-    if table.count(teamInfo) > 0 then
+    if table.icount(teamInfo) > 0 then
         techPoints = teamInfo[1]:GetNumCapturedTechPoints()
         harvesters = teamInfo[1]:GetNumCapturedResPoints()
     end
@@ -481,7 +621,7 @@ function GetAttachEntity(techId, position, snapRadius)
 
     if attachClass then
     
-        for index, currentEnt in ipairs( GetEntitiesWithinRange(attachClass, position, ConditionalValue(snapRadius, snapRadius, .5)) ) do
+        for _, currentEnt in ipairs( GetEntitiesWithinRange(attachClass, position, ConditionalValue(snapRadius, snapRadius, .5)) ) do
         
             if not currentEnt:GetAttached() then
             
@@ -595,12 +735,12 @@ function GetRandomSpawnForCapsule(capsuleHeight, capsuleRadius, origin, minRange
     
     for i = 0, 10 do
     
-        local spawnPoint = nil
+        local spawnPoint
         local points = GetRandomPointsWithinRadius(origin, minRange, maxRange, maxHeight, 1, 1, nil, validationFunc)
         if #points == 1 then
             spawnPoint = points[1]
         elseif Server then
-            Print("GetRandomPointsWithinRadius() failed inside of GetRandomSpawnForCapsule()")
+            --Print("GetRandomPointsWithinRadius() failed inside of GetRandomSpawnForCapsule()")
         end
         
         if spawnPoint then
@@ -653,7 +793,7 @@ end
 
 function CreateFilter(entity1, entity2)
 
-    local filter = nil
+    local filter
     if entity1 and entity2 then
         filter = EntityFilterTwo(entity1, entity2)
     elseif entity1 then
@@ -669,10 +809,10 @@ end
 function GetPointBlocksAttachEntities(origin)
 
     local nozzles = GetEntitiesWithinRange("ResourcePoint", origin, 1.5)
-    if table.count(nozzles) == 0 then
+    if table.icount(nozzles) == 0 then
     
         local techPoints = GetEntitiesWithinRange("TechPoint", origin, 3.2)
-        if table.count(techPoints) == 0 then
+        if table.icount(techPoints) == 0 then
         
             return false
             
@@ -784,11 +924,11 @@ end
 
 function GetTriggerEntity(position, teamNumber)
 
-    local triggerEntity = nil
-    local minDist = nil
+    local triggerEntity
+    local minDist
     local ents = GetEntitiesWithMixinForTeamWithinRange("Live", teamNumber, position, .5)
     
-    for index, ent in ipairs(ents) do
+    for _, ent in ipairs(ents) do
     
         local dist = (ent:GetOrigin() - position):GetLength()
         
@@ -870,7 +1010,7 @@ end
 
 -- Get damage type description text for tooltips
 function DamageTypeDesc(damageType)
-    if table.count(kDamageTypeDesc) >= damageType then
+    if table.icount(kDamageTypeDesc) >= damageType then
         if kDamageTypeDesc[damageType] ~= "" then
             return string.format("(%s)", kDamageTypeDesc[damageType])
         end
@@ -886,73 +1026,73 @@ function GetHealthColor(scalar)
     local spreadComponent = 255 - minComponent
 
     scalar = Clamp(scalar, 0, 1)
-    
+
     if scalar <= kNearDeadThreshold then
-    
-       -- Faded red to bright red
+
+        -- Faded red to bright red
         local r = minComponent + (scalar / kNearDeadThreshold) * spreadComponent
         return {r, 0, 0}
-        
+
     elseif scalar <= kHurtThreshold then
-    
+
         local redGreen = minComponent + ( (scalar - kNearDeadThreshold) / (kHurtThreshold - kNearDeadThreshold) ) * spreadComponent
         return {redGreen, redGreen, 0}
-        
+
     else
-    
+
         local g = minComponent + ( (scalar - kHurtThreshold) / (1 - kHurtThreshold) ) * spreadComponent
         return {0, g, 0}
-        
+
     end
-    
+
 end
 
 function GetEntsWithTechId(techIdTable, attachRange, position)
 
     local ents = {}
-    
-    local entities = nil
-    
-    if attachRange and position then        
-        entities = GetEntitiesWithMixinWithinRange("Tech", position, attachRange)        
+
+    local entities
+
+    if attachRange and position then
+        entities = GetEntitiesWithMixinWithinRange("Tech", position, attachRange)
     else
         entities = GetEntitiesWithMixin("Tech")
     end
-    
-    for index, entity in ipairs(entities) do
-    
+
+    for _, entity in ipairs(entities) do
+
         if table.find(techIdTable, entity:GetTechId()) then
             table.insert(ents, entity)
         end
-        
+
     end
-    
+
     return ents
-    
+
 end
 
 function GetEntsWithTechIdIsActive(techIdTable, attachRange, position)
 
     local ents = {}
-    
-    local entities = nil
-    
-    if attachRange and position then        
-        entities = GetEntitiesWithMixinWithinRange("Tech", position, attachRange)        
+
+    local entities
+
+    if attachRange and position then
+        entities = GetEntitiesWithMixinWithinRange("Tech", position, attachRange)
     else
         entities = GetEntitiesWithMixin("Tech")
     end
-    
-    for index, entity in ipairs(entities) do
-    
+
+    for _, entity in ipairs(entities) do
+
         if table.find(techIdTable, entity:GetTechId()) and GetIsUnitActive(entity) then
             table.insert(ents, entity)
         end
-        
+
     end
-    
+
     return ents
-    
+
 end
 
 function GetFreeAttachEntsForTechId(techId)
@@ -961,42 +1101,41 @@ function GetFreeAttachEntsForTechId(techId)
 
     local attachClass = LookupTechData(techId, kStructureAttachClass)
 
-    if attachClass ~= nil then    
-    
-        for index, ent in ientitylist(Shared.GetEntitiesWithClassname(attachClass)) do
-        
+    if attachClass ~= nil then
+
+        for _, ent in ientitylist(Shared.GetEntitiesWithClassname(attachClass)) do
+
             if ent ~= nil and ent:GetAttached() == nil then
                 table.insert(freeEnts, ent)
             end
-            
+
         end
-        
+
     end
-    
+
     return freeEnts
-    
+
 end
 
 function GetNearestFreeAttachEntity(techId, origin, range)
 
-    local nearest = nil
-    local nearestDist = nil
-    
-    for index, ent in ipairs(GetFreeAttachEntsForTechId(techId)) do
-    
+    local nearest, nearestDist
+
+    for _, ent in ipairs(GetFreeAttachEntsForTechId(techId)) do
+
         local dist = (ent:GetOrigin() - origin):GetLengthXZ()
-        
+
         if (nearest == nil or dist < nearestDist) and (range == nil or dist <= range) then
-        
+
             nearest = ent
             nearestDist = dist
-            
+
         end
-        
+
     end
-    
+
     return nearest
-    
+
 end
 
 -- Trace until we hit the "inside" of the level or hit nothing. Returns nil if we hit nothing,
@@ -1006,64 +1145,78 @@ end
 -- the mouse was clicked, or if worldCoordsSpecified is true, it's the XZ position of the order
 -- given to the minimap. In that case, trace from above it straight down to find the target.
 -- The last parameter is false if target is for selection, true if it's for building
-function GetCommanderPickTarget(player, pickVec, worldCoordsSpecified, forBuild, ignoreEntities)
+function GetCommanderPickTarget(player, pickVec, worldCoordsSpecified, forBuild, filter, traceThickness, traceType )
 
-    local done = false
-    local startPoint = player:GetOrigin() 
+    traceType = traceType or 'ray'
+    local ogPickVec = Vector()
+    VectorCopy(pickVec, ogPickVec)
 
-    if worldCoordsSpecified and pickVec then
+    local startPoint = player:GetOrigin()
+    if worldCoordsSpecified then
         startPoint = Vector(pickVec.x, startPoint.y + 20, pickVec.z)
         pickVec = Vector(0, -1, 0)
     end
-    
-    local trace = nil
-    local mask = ConditionalValue(forBuild, PhysicsMask.CommanderBuild, PhysicsMask.CommanderSelect) 
-    
-    while not done do
 
-       -- Use either select or build mask depending what it's for       
+    local trace
+    local mask = ConditionalValue(forBuild, PhysicsMask.CommanderBuild, PhysicsMask.CommanderSelect)
+    local extents = traceType == 'box' and traceThickness and GetDirectedExtentsForDiameter(pickVec, traceThickness)
+
+    -- keep this method compatible with old api where you couldn't directly pass a filter but only specified if all entities or only the player are to be filtered
+    filter = filter == true and EntityFilterAll() or type(filter) == "function" and filter or EntityFilterOne(player)
+
+    while true do
+
         local endPoint = startPoint + pickVec * 1000
-        
-        if ignoreEntities == true then
-            trace = Shared.TraceRay(startPoint, endPoint, CollisionRep.Select, mask, EntityFilterAll())
-        else
-            trace = Shared.TraceRay(startPoint, endPoint, CollisionRep.Select, mask, EntityFilterOne(player))
-        end
-        
-        local hitDistance = (startPoint - trace.endPoint):GetLength()
-        
-       -- Try again if we're inside the surface
-        if(trace.fraction == 0 or hitDistance < .1) then
-        
-            startPoint = startPoint + pickVec
-        
-        elseif(trace.fraction == 1) then
-        
-            done = true
 
-       -- Only hit a target that's facing us (skip surfaces facing away from us)            
-        elseif trace.normal.y < 0 then
-        
-           -- Trace again from what we hit
-            startPoint = trace.endPoint + pickVec * 0.01
-            
+        if traceType == 'ray' then
+            trace = Shared.TraceRay(startPoint, endPoint, CollisionRep.Select, mask, filter)
         else
-                    
-            done = true
-                
+            trace = Shared.TraceBox(extents, startPoint, endPoint, CollisionRep.Select, mask, filter)
         end
-        
+
+        local hitDistance = (startPoint - trace.endPoint):GetLength()
+
+        -- Try again if we're inside the surface
+        if(trace.fraction == 0 or hitDistance < .1) then
+
+            startPoint = startPoint + pickVec
+
+        elseif(trace.fraction == 1) then
+
+            -- Nothing found
+            break
+
+            -- Only hit a target that's facing us (skip surfaces facing away from us)
+        elseif trace.normal.y < 0 then
+
+            -- Trace again from what we hit
+            startPoint = trace.endPoint + pickVec * 0.01
+
+        else
+
+            -- Hit something (might be the floor)
+            break
+
+        end
+
     end
-    
+
+    if traceType == 'ray' and traceThickness and not trace.entity then
+        local trace2 = GetCommanderPickTarget(player, ogPickVec, worldCoordsSpecified, forBuild, filter, traceThickness, 'box' )
+        if trace2.entity then
+            return trace2
+        end
+    end
+
     return trace
-    
+
 end
 
 function GetAreEnemies(entityOne, entityTwo)
     return entityOne and entityTwo and HasMixin(entityOne, "Team") and HasMixin(entityTwo, "Team") and (
-            (entityOne:GetTeamNumber() == kMarineTeamType and entityTwo:GetTeamNumber() == kAlienTeamType) or
+    (entityOne:GetTeamNumber() == kMarineTeamType and entityTwo:GetTeamNumber() == kAlienTeamType) or
             (entityOne:GetTeamNumber() == kAlienTeamType and entityTwo:GetTeamNumber() == kMarineTeamType)
-           )
+    )
 end
 
 function GetAreFriends(entityOne, entityTwo)
@@ -1087,19 +1240,25 @@ function GetEnemyTeamNumber(entityTeamNumber)
         return kTeam1Index
     else
         return kTeamInvalid
-    end    
-    
+    end
+
 end
 
 function SpawnPlayerAtPoint(player, origin, angles)
 
     player:SetOrigin(origin)
-    
+
     if angles then
-        -- For some reason only the "pitch" adjusts the in game angle, so take the yaw (the rotation of the entity) and convert it to "roll". Also SetViewAngles does not work here.
-        player:SetBaseViewAngles(Angles(0, angles.yaw, 0))
-    end        
-    
+        -- For some reason only the "pitch" adjusts the in game angle, 
+        -- so take the yaw (the rotation of the entity) and convert it 
+        -- to "roll". Also SetViewAngles does not work here.
+
+        --From McG: no clue what above note is about. SetViewAngles works without issue
+        --Best guess, at some point this it was broken due to another issue, so this was
+        --never actually broken.
+        player:SetViewAngles(angles)
+    end
+
 end
 
 --[[
@@ -1118,62 +1277,62 @@ end
 
 function GetNearestTechPoint(origin, availableOnly)
 
-   -- Look for nearest empty tech point to use instead
-    local nearestTechPoint = nil
+    -- Look for nearest empty tech point to use instead
+    local nearestTechPoint
     local nearestTechPointDistance = 0
-    
-    for index, techPoint in ientitylist(Shared.GetEntitiesWithClassname("TechPoint")) do
-    
-       -- Only use unoccupied tech points that are neutral or marked for use with our team
-        local techPointTeamNumber = techPoint:GetTeamNumberAllowed()        
+
+    for _, techPoint in ientitylist(Shared.GetEntitiesWithClassname("TechPoint")) do
+
+        -- Only use unoccupied tech points that are neutral or marked for use with our team
+        local techPointTeamNumber = techPoint:GetTeamNumberAllowed()
         if not availableOnly or techPoint:GetAttached() == nil then
-        
+
             local distance = (techPoint:GetOrigin() - origin):GetLength()
             if nearestTechPoint == nil or distance < nearestTechPointDistance then
-            
+
                 nearestTechPoint = techPoint
                 nearestTechPointDistance = distance
-                
+
             end
-            
+
         end
-        
+
     end
-    
+
     return nearestTechPoint
-    
+
 end
 
 function GetNearest(origin, className, teamNumber, filterFunc)
 
     assert(type(className) == "string")
-    
-    local nearest = nil
+
+    local nearest
     local nearestDistance = 0
-    
-    for index, ent in ientitylist(Shared.GetEntitiesWithClassname(className)) do
-    
-       -- Filter is optional, pass through if there is no filter function defined.
+
+    for _, ent in ientitylist(Shared.GetEntitiesWithClassname(className)) do
+
+        -- Filter is optional, pass through if there is no filter function defined.
         if not filterFunc or filterFunc(ent) then
-        
+
             if teamNumber == nil or (teamNumber == ent:GetTeamNumber()) then
-            
-                local distance = (ent:GetOrigin() - origin):GetLength()
+
+                local distance = (ent:GetOrigin() - origin):GetLengthSquared()
                 if nearest == nil or distance < nearestDistance then
-                
+
                     nearest = ent
                     nearestDistance = distance
-                    
+
                 end
-                
+
             end
-            
+
         end
-        
+
     end
-    
+
     return nearest
-    
+
 end
 
 function GetCanAttackEntity(seeingEntity, targetEntity)
@@ -1182,67 +1341,67 @@ end
 
 -- Computes line of sight to entity, set considerObstacles to true to check if any other entity is blocking LOS
 local toEntity = Vector()
-function GetCanSeeEntity(seeingEntity, targetEntity, considerObstacles)
+function GetCanSeeEntity(seeingEntity, targetEntity, considerObstacles, obstaclesFilter)
 
     PROFILE("NS2Utility:GetCanSeeEntity")
-    
+
     local seen = false
-    
-   -- See if line is in our view cone
+
+    -- See if line is in our view cone
     if targetEntity:GetIsVisible() then
-    
+
         local targetOrigin = HasMixin(targetEntity, "Target") and targetEntity:GetEngagementPoint() or targetEntity:GetOrigin()
         local eyePos = GetEntityEyePos(seeingEntity)
-        
-       -- Not all seeing entity types have a FOV.
-       -- So default to within FOV.
+
+        -- Not all seeing entity types have a FOV.
+        -- So default to within FOV.
         local withinFOV = true
-        
-       -- Anything that has the GetFov method supports FOV checking.
+
+        -- Anything that has the GetFov method supports FOV checking.
         if seeingEntity.GetFov ~= nil then
-        
-           -- Reuse vector
+
+            -- Reuse vector
             toEntity.x = targetOrigin.x - eyePos.x
             toEntity.y = targetOrigin.y - eyePos.y
             toEntity.z = targetOrigin.z - eyePos.z
-            
-           -- Normalize vector        
+
+            -- Normalize vector
             local toEntityLength = math.sqrt(toEntity.x * toEntity.x + toEntity.y * toEntity.y + toEntity.z * toEntity.z)
             if toEntityLength > kEpsilon then
-            
+
                 toEntity.x = toEntity.x / toEntityLength
                 toEntity.y = toEntity.y / toEntityLength
                 toEntity.z = toEntity.z / toEntityLength
-                
+
             end
-            
+
             local seeingEntityAngles = GetEntityViewAngles(seeingEntity)
-            local normViewVec = seeingEntityAngles:GetCoords().zAxis        
+            local normViewVec = seeingEntityAngles:GetCoords().zAxis
             local dotProduct = Math.DotProduct(toEntity, normViewVec)
             local fov = seeingEntity:GetFov()
-            
-           -- players have separate fov for marking enemies as sighted
+
+            -- players have separate fov for marking enemies as sighted
             if seeingEntity.GetMinimapFov then
                 fov = seeingEntity:GetMinimapFov(targetEntity)
             end
-            
+
             local halfFov = math.rad(fov / 2)
             local s = math.acos(dotProduct)
             withinFOV = s < halfFov
-            
+
         end
-        
+
         if withinFOV then
-        
+
             local filter = EntityFilterAllButIsa("Door")-- EntityFilterAll()
             if considerObstacles then
-               -- Weapons don't block FOV
-                filter = EntityFilterTwoAndIsa(seeingEntity, targetEntity, "Weapon")
+                -- Weapons don't block FOV
+                filter = obstaclesFilter or EntityFilterTwoAndIsa(seeingEntity, targetEntity, "Weapon")
             end
-        
-           -- See if there's something blocking our view of the entity.
+
+            -- See if there's something blocking our view of the entity.
             local trace = Shared.TraceRay(eyePos, targetOrigin, CollisionRep.LOS, PhysicsMask.All, filter)
-            
+
             if trace.fraction == 1 then
                 seen = true
             end
@@ -1250,9 +1409,9 @@ function GetCanSeeEntity(seeingEntity, targetEntity, considerObstacles)
         end
 
     end
-    
+
     return seen
-    
+
 end
 
 function GetLocations()
@@ -1262,43 +1421,45 @@ end
 function GetLocationForPoint(point, ignoredLocation)
 
     local ents = GetLocations()
-    
-    for index, location in ipairs(ents) do
-    
+
+    for _, location in ipairs(ents) do
+
         if location ~= ignoredLocation and location:GetIsPointInside(point) then
-        
+
             return location
-            
-        end    
-        
+
+        end
+
     end
-    
+
     return nil
 
 end
 
 function GetLocationEntitiesNamed(name)
-
+    
+    PROFILE("GetLocationEntitiesNamed")
+    
     local locationEntities = {}
-    
+
     if name ~= nil and name ~= "" then
-    
+
         local ents = GetLocations()
-        
-        for index, location in ipairs(ents) do
-        
+
+        for _, location in ipairs(ents) do
+
             if location:GetName() == name then
-            
+
                 table.insert(locationEntities, location)
-                
+
             end
-            
+
         end
-        
+
     end
 
     return locationEntities
-    
+
 end
 
 function GetPowerPointForLocation(locationName)
@@ -1306,130 +1467,195 @@ function GetPowerPointForLocation(locationName)
     if locationName == nil or locationName == "" then
         return nil
     end
-    
+
     local locationId = Shared.GetStringIndex(locationName)
-    
     local powerPoints = Shared.GetEntitiesWithClassname("PowerPoint")
-    for p = 1, powerPoints:GetSize() do
-    
-        local powerPoint = powerPoints:GetEntityAtIndex(p - 1)
-        if powerPoint then
-        
-            if powerPoint:GetLocationId() == locationId then
-                return powerPoint
-            end
-            
+    for _, powerPoint in ientitylist(powerPoints) do
+        if powerPoint:GetLocationId() == locationId then
+            return powerPoint
         end
-        
     end
-    
+
     return nil
-    
+
 end
 
 -- for performance, cache the lights for each locationName
 local lightLocationCache = {}
 
 function GetLightsForLocation(locationName)
-
+    
+    PROFILE("GetLightsForLocation")
+    
     if locationName == nil or locationName == "" then
         return {}
     end
- 
+
     if lightLocationCache[locationName] then
-        return lightLocationCache[locationName]   
+        return lightLocationCache[locationName]
     end
 
     local lightList = {}
-    
-    local locations = GetLocationEntitiesNamed(locationName)
-   
-    if table.count(locations) > 0 then
-   
-        for index, location in ipairs(locations) do
-           
-            for index, renderLight in ipairs(Client.lightList) do
 
-                if renderLight then
-                
-                    local lightOrigin = renderLight:GetCoords().origin
-                   
-                    if location:GetIsPointInside(lightOrigin) then
-                   
-                        table.insert(lightList, renderLight)
-           
-                    end
-                   
+    local locationTransforms = Client.locationList[locationName]
+    
+    for _, locationTransform in ipairs(locationTransforms) do
+
+        for _, renderLight in ipairs(Client.lightList) do
+
+            if renderLight then
+
+                local lightOrigin = renderLight:GetCoords().origin
+
+                local transformedPt = locationTransform:TransformPoint(lightOrigin)
+                if transformedPt.x >= -1 and transformedPt.x < 1.0 and
+                   transformedPt.y >= 0 and transformedPt.y < 2.0 and -- origin is on the bottom-center of the box.
+                   transformedPt.z >= -1 and transformedPt.z < 1.0 then
+
+                    table.insert(lightList, renderLight)
+
                 end
-               
+
             end
-           
+
         end
-       
+
     end
 
-   --Log("Total lights %s, lights in %s = %s", #Client.lightList, locationName, #lightList)
+    --Log("Total lights %s, lights in %s = %s", #Client.lightList, locationName, #lightList)
     lightLocationCache[locationName] = lightList
-  
+
     return lightList
-   
+
 end
 
 -- for performance, cache the probes for each locationName
 local probeLocationCache = {}
 
 function GetReflectionProbesForLocation(locationName)
-
+    
+    PROFILE("GetReflectionProbesForLocation")
+    
     if locationName == nil or locationName == "" then
         return {}
     end
- 
+
     if probeLocationCache[locationName] then
-        return probeLocationCache[locationName]   
+        return probeLocationCache[locationName]
     end
 
     local probeList = {}
-   
-    local locations = GetLocationEntitiesNamed(locationName)
-   
-    if table.count(locations) > 0 then
-   
-        for index, location in ipairs(locations) do
-           
-       -- TEMP FIX FOR SCRIPT ERRORS
-            if Client.reflectionProbeList then
-            for index, probe in ipairs(Client.reflectionProbeList) do
+
+    local locationTransforms = Client.locationList[locationName]
+
+    for _, locationTransform in ipairs(locationTransforms) do
+        
+        if Client.reflectionProbeList then
+            for _, probe in ipairs(Client.reflectionProbeList) do
 
                 if probe then
-               
+
                     local probeOrigin = probe:GetOrigin()
-                   
-                    if location:GetIsPointInside(probeOrigin) then
-                   
+
+                    local transformedPt = locationTransform:TransformPoint(probeOrigin)
+                    if transformedPt.x >= -1 and transformedPt.x < 1.0 and
+                       transformedPt.y >= 0 and transformedPt.y < 2.0 and -- origin is on the bottom-center of the box.
+                       transformedPt.z >= -1 and transformedPt.z < 1.0 then
+
                         table.insert(probeList, probe)
-           
+
                     end
-                   
+
                 end
-               
+
             end
-            end
-           
         end
-       
+
+    end
+    
+    probeLocationCache[locationName] = probeList
+
+    return probeList
+
+end
+
+local glowPropLocationCache = {}
+
+function GetGlowingPropsForLocation(locationName)
+    
+    PROFILE("GetGlowingPropsForLocation")
+    
+    if locationName == nil or locationName == "" then
+        return {}
     end
 
-   -- Log("Total lights %s, lights in %s = %s", #Client.lightList, locationName, #lightList)
-    probeLocationCache[locationName] = probeList
-  
-    return probeList
-   
+    if glowPropLocationCache[locationName] then
+        return glowPropLocationCache[locationName]
+    end
+
+    local propList = {}
+
+    local locationTransforms = Client.locationList[locationName]
+    
+    for _, locationTransform in ipairs(locationTransforms) do
+
+        for _, propLight in ipairs(Client.glowingProps) do
+
+            if propLight then
+
+                local lightOrigin = propLight:GetCoords().origin
+                
+                local transformedPt = locationTransform:TransformPoint(lightOrigin)
+                if transformedPt.x >= -1 and transformedPt.x < 1.0 and
+                   transformedPt.y >= 0 and transformedPt.y < 2.0 and -- origin is on the bottom-center of the box.
+                   transformedPt.z >= -1 and transformedPt.z < 1.0 then
+
+                    table.insert(propList, propLight)
+
+                end
+
+            end
+
+        end
+
+    end
+    
+    --Log("Total glowing props %s, glow props in %s = %s", #Client.glowingProps, locationName, #propList)
+    
+    glowPropLocationCache[locationName] = propList
+
+    return propList
+
+end
+
+-- Iterate over all location name strings, caching the light, reflection probe, and emissive prop
+-- locations so it's available during the game.  (Gets the hitch and GC bump out of the way early.)
+function PrecacheLightsAndProps()
+    
+    PROFILE("PrecacheLightsAndProps")
+    
+    assert(Client)
+    
+    local idx = 2 -- location names start at 2 for some reason... the string at index 1 is "".
+    while true do
+        local str = Shared.GetString(idx)
+        if str == "" then -- indexing out of bounds yields "".
+            return
+        end
+        
+        GetLightsForLocation(str)
+        GetReflectionProbesForLocation(str)
+        GetGlowingPropsForLocation(str)
+        
+        idx = idx + 1
+    end
+    
 end
 
 function ClearLights()
 
     if Client.lightList ~= nil then
-        for index, light in ipairs(Client.lightList) do
+        for _, light in ipairs(Client.lightList) do
             Client.DestroyRenderLight(light)
         end
         Client.lightList = { }
@@ -1442,24 +1668,24 @@ local function SetLight(renderLight, intensity, color)
     if intensity then
         renderLight:SetIntensity(intensity)
     end
-    
+
     if color then
-    
+
         renderLight:SetColor(color)
-        
+
         if renderLight:GetType() == RenderLight.Type_AmbientVolume then
-        
+
             renderLight:SetDirectionalColor(RenderLight.Direction_Right,    color)
             renderLight:SetDirectionalColor(RenderLight.Direction_Left,     color)
             renderLight:SetDirectionalColor(RenderLight.Direction_Up,       color)
             renderLight:SetDirectionalColor(RenderLight.Direction_Down,     color)
             renderLight:SetDirectionalColor(RenderLight.Direction_Forward,  color)
             renderLight:SetDirectionalColor(RenderLight.Direction_Backward, color)
-            
+
         end
-        
+
     end
-    
+
 end
 
 local kMinCommanderLightIntensityScalar = 0.3
@@ -1468,71 +1694,163 @@ local function UpdateRedLightsforPowerPointWorker(self)
 
     for renderLight,_ in pairs(self.activeLights) do
 
-       --Max redness already.
+        --Max redness already.
         local angleRad = 1 * math.pi / 2
-       -- and scalar goes 0->1
+        -- and scalar goes 0->1
         local scalar = math.sin(angleRad)
-        
+
         local showCommanderLight = false
 
         local player = Client.GetLocalPlayer()
         if player and player:isa("Commander") then
             showCommanderLight = true
         end
-        
+
         if showCommanderLight then
             scalar = math.max(kMinCommanderLightIntensityScalar, scalar)
         end
-        
-        intensity = scalar * renderLight.originalIntensity
+
+        local intensity = scalar * renderLight.originalIntensity
 
         intensity = intensity * self:CheckFlicker(renderLight,PowerPoint.kAuxFlickerChance, scalar)
-        
+
+        local color
         if showCommanderLight then
             color = PowerPoint.kDisabledCommanderColor
         else
             color = PowerPoint.kDisabledColor
         end
-        
+
         SetLight(renderLight, intensity, color)
 
     end
-    
+
 end
 
-local gLowLights
+function NotifyEntitiesWithFilteredCinematics()
+    for _, entity in ipairs(GetEntitiesWithMixin("FilteredCinematicUser")) do
+        entity:OnFilteredCinematicOptionChanged()
+    end
+end
+
+function MinimalParticlesOption_Update()
+
+    Client.kMinimalParticles = GetAdvancedOption("particles")
+    NotifyEntitiesWithFilteredCinematics()
+
+end
+
+function ViewModelOption_Update()
+
+    local player = Client.GetLocalPlayer()
+    if player then
+
+        local drawviewmodel = GetAdvancedOption("drawviewmodel")
+        local drawviewmodel_a = GetAdvancedOption("drawviewmodel_a")
+        Client.kHideViewModel = drawviewmodel == 1 or
+            drawviewmodel == 2 and
+                (
+                    player:isa("Marine") and not GetAdvancedOption("drawviewmodel_m") or
+                        player:isa("Exo") and not GetAdvancedOption("drawviewmodel_exo")  or
+                        player:isa("Alien") and drawviewmodel_a ~= 0 and
+                            (
+                                drawviewmodel_a == 1 or
+                                    player:isa("Skulk") and not GetAdvancedOption("drawviewmodel_skulk") or
+                                    player:isa("Gorge") and not GetAdvancedOption("drawviewmodel_gorge") or
+                                    player:isa("Lerk")  and not GetAdvancedOption("drawviewmodel_lerk")  or
+                                    player:isa("Fade")  and not GetAdvancedOption("drawviewmodel_fade")  or
+                                    player:isa("Onos")  and not GetAdvancedOption("drawviewmodel_onos")
+                            )
+                )
+
+        if ClientUI then
+            ClientUI.RestartScripts
+            {
+                "Hud/Marine/GUIMarineHUD",
+                "GUIExoEject"
+            }
+        end
+
+        NotifyEntitiesWithFilteredCinematics()
+
+    end
+
+
+end
+
+local gLightQuality
 function Lights_UpdateLightMode()
 
-   --Dont attempt to load lowlights for main menu 'map'
+    -- Don't attempt to load lowlights for main menu 'map'
     if Client.fullyLoaded then
 
         local LoadData
-        local useLowLights = Client.GetOptionInteger("graphics/lightQuality", 2) == 1
-        
-        if useLowLights and #Client.lowLightList > 0 then
-            LoadData = Client.lowLightList
+
+        -- Check the light quality options. Check low and minimal options and notify the client if the map doesn't support
+        -- the chosen option. The light lists are initialized in early world (as long as the map has 1 light), so these should be fine to use.
+        local lightQuality = Client.GetOptionInteger("graphics/lightQuality", 2)
+        local hasLowLights = Client.lowLightList and #Client.lowLightList > 0
+        local hasMinimalLights = Client.minimalLightList and #Client.minimalLightList > 0
+
+        --[[
+            Light quality options
+
+            0: Minimal
+            1: Low
+            2: High
+        --]]
+        if lightQuality == 0 then
+
+            if not hasMinimalLights then
+
+                -- Now try "Low"
+                if not hasLowLights then
+                    Shared.Message("Map doesn't support the minimal or low lights option, defaulting to regular lights.")
+                    Shared.ConsoleCommand("output " .. "Map doesn't support the minimal or low lights option, defaulting to regular lights.")
+                    LoadData = Client.originalLights
+                else
+                    Shared.Message("Map doesn't support the minimal lights option, defaulting to low lights.")
+                    Shared.ConsoleCommand("output " .. "Map doesn't support the minimal lights option, defaulting to low lights.")
+                    LoadData = Client.lowLightList
+                end
+
+            else
+                LoadData = Client.minimalLightList
+            end
+
+        elseif lightQuality == 1 then
+
+            if not hasLowLights then
+                Shared.Message("Map doesn't support the low lights option, defaulting to regular lights.")
+                Shared.ConsoleCommand("output " .. "Map doesn't support the low lights option, defaulting to regular lights.")
+                LoadData = Client.originalLights
+            else
+                LoadData = Client.lowLightList
+            end
+
         else
             LoadData = Client.originalLights
         end
 
-        if LoadData and useLowLights ~= gLowLights then
+        -- Now we finally load/re-load the lights.
+        if LoadData and lightQuality ~= gLightQuality then
 
             ClearLights()
-            gLowLights = useLowLights
+            gLightQuality = lightQuality
 
-            for i, object in ipairs(LoadData) do
+            for _, object in ipairs(LoadData) do
                 LoadMapEntity(object.className, object.groupName, object.values)
             end
 
             lightLocationCache = { }
 
             local powerPoints = Shared.GetEntitiesWithClassname("PowerPoint")
-            for index, powerPoint in ientitylist(powerPoints) do
-            
-                if powerPoint.lightHandler then            
+            for _, powerPoint in ientitylist(powerPoints) do
+
+                if powerPoint.lightHandler then
                     powerPoint.lightHandler:Reset()
                 end
-                
+
             end
 
         end
@@ -1545,15 +1863,15 @@ if Client then
 
     function ResetLights()
 
-        for index, renderLight in ipairs(Client.lightList) do
-        
+        for _, renderLight in ipairs(Client.lightList) do
+
             renderLight:SetColor(renderLight.originalColor)
             renderLight:SetIntensity(renderLight.originalIntensity)
 
-        end                    
-        
+        end
+
     end
-    
+
 end
 
 local kUpVector = Vector(0, 1, 0)
@@ -1650,13 +1968,13 @@ function GetEngagementDistance(entIdOrTechId, trueTechId)
         
     end
     
-    local desc = nil
+    --local desc = nil
     if success then
     
         distance = LookupTechData(techId, kTechDataEngagementDistance, nil)
         
         if distance then
-            desc = EnumToString(kTechId, techId)    
+            --desc = EnumToString(kTechId, techId)    
         else
             distance = 1
             success = false
@@ -1805,28 +2123,27 @@ end
 -- Returns nil if none exists in range.
 function GetActivationTarget(teamNumber, position)
 
-    local nearestTarget = nil
-    local nearestDist = nil
-    
+    local nearestTarget, nearestDist
+
     local targets = GetEntitiesWithMixinForTeamWithinRange("Live", teamNumber, position, 2)
-    for index, target in ipairs(targets) do
-    
+    for _, target in ipairs(targets) do
+
         if target:GetIsVisible() and not target:isa("Infestation") then
-        
+
             local dist = (target:GetOrigin() - position):GetLength()
             if nearestTarget == nil or dist < nearestDist then
-            
+
                 nearestTarget = target
                 nearestDist = dist
-                
+
             end
-            
+
         end
-        
+
     end
-    
+
     return nearestTarget
-    
+
 end
 
 function GetSelectionText(entity, teamNumber)
@@ -1865,15 +2182,12 @@ function GetSelectionText(entity, teamNumber)
         local techId = entity:GetTechId()
         
         local secondaryText = ""
-        if entity:isa("PowerPoint") and not entity:GetIsBuilt() and entity.buildFraction == 1 then
-            secondaryText = Locale.ResolveString("CONSTRUCT_PRIMED")
-
-        elseif HasMixin(entity, "Construct") and not entity:GetIsBuilt() then        
+        if HasMixin(entity, "Construct") and not entity:GetIsBuilt() then
             secondaryText = Locale.ResolveString("CONSTRUCT_UNBUILT")
-            
+
         elseif HasMixin(entity, "PowerConsumer") and entity:GetRequiresPower() and not entity:GetIsPowered() then
             secondaryText = Locale.ResolveString("CONSTRUCT_UNPOWERED")
-            
+                  
         elseif entity:isa("Whip") then
         
             if not entity:GetIsRooted() then
@@ -1949,29 +2263,49 @@ function GetFriendlyFire()
     return false
 end
 
+local allowedWarmUpStrcutures = {
+    "Hydra",
+    "Clog",
+    "TunnelEntrance"
+}
+function GetValidTargetInWarmUp(target)
+
+    for _, classname in ipairs(allowedWarmUpStrcutures) do
+        if target:isa(classname) then
+            return true
+        end
+    end
+
+    return not HasMixin(target, "Construct")
+end
+
 -- All damage is routed through here.
 function CanEntityDoDamageTo(attacker, target, cheats, devMode, friendlyFire, damageType)
 
-    if GetGameInfoEntity():GetState() == kGameState.NotStarted then
+    if not GetGameInfoEntity():GetGameStarted() and not GetWarmupActive() then
         return false
     end
-    
+
     if target:isa("Clog") then
         return true
     end
-    
+
     if not HasMixin(target, "Live") then
         return false
     end
-    
+
+    if GetWarmupActive() and not GetValidTargetInWarmUp(target) then
+        return false
+    end
+
     if target:isa("ARC") and damageType == kDamageType.Splash then
         return true
     end
-    
+
     if not target:GetCanTakeDamage() then
         return false
     end
-    
+
     if target == nil or (target.GetDarwinMode and target:GetDarwinMode()) then
         return false
     elseif cheats or devMode then
@@ -1979,64 +2313,64 @@ function CanEntityDoDamageTo(attacker, target, cheats, devMode, friendlyFire, da
     elseif attacker == nil then
         return true
     end
-    
-   -- You can always do damage to yourself.
+
+    -- You can always do damage to yourself.
     if attacker == target then
         return true
     end
-    
-   -- Command stations can kill even friendlies trapped inside.
+
+    -- Command stations can kill even friendlies trapped inside.
     if attacker ~= nil and attacker:isa("CommandStation") then
         return true
     end
-    
-   -- Your own grenades can hurt you.
+
+    -- Your own grenades can hurt you.
     if attacker:isa("Grenade") then
-    
+
         local owner = attacker:GetOwner()
         if owner and owner:GetId() == target:GetId() then
             return true
         end
-        
+
     end
-    
-   -- Same teams not allowed to hurt each other unless friendly fire enabled.
+
+    -- Same teams not allowed to hurt each other unless friendly fire enabled.
     local teamsOK = true
     if attacker ~= nil then
         teamsOK = GetAreEnemies(attacker, target) or friendlyFire
     end
-    
-   -- Allow damage of own stuff when testing.
+
+    -- Allow damage of own stuff when testing.
     return teamsOK
-    
+
 end
 
 function TraceMeleeBox(weapon, eyePoint, axis, extents, range, mask, filter)
 
-   -- We make sure that the given range is actually the start/end of the melee volume by moving forward the
-   -- starting point with the extents (and some extra to make sure we don't hit anything behind us),
-   -- as well as moving the endPoint back with the extents as well (making sure we dont trace backwards)
-    
-   -- Make sure we don't hit anything behind us.
+    -- We make sure that the given range is actually the start/end of the melee volume by moving forward the
+    -- starting point with the extents (and some extra to make sure we don't hit anything behind us),
+    -- as well as moving the endPoint back with the extents as well (making sure we dont trace backwards)
+
+    -- Make sure we don't hit anything behind us.
     local startPoint = eyePoint + axis * weapon:GetMeleeOffset()
-    local endPoint = eyePoint + axis * math.max(0, range) 
+    local endPoint = eyePoint + axis * math.max(0, range)
     local trace = Shared.TraceBox(extents, startPoint, endPoint, CollisionRep.Damage, mask, filter)
     return trace, startPoint, endPoint
-    
+
 end
 
 local function IsPossibleMeleeTarget(player, target, teamNumber)
 
     if target and HasMixin(target, "Live") and target:GetCanTakeDamage() and target:GetIsAlive() then
-    
+
         if HasMixin(target, "Team") and teamNumber == target:GetTeamNumber() then
             return true
         end
-        
+
     end
-    
+
     return false
-    
+
 end
 
 --[[
@@ -2051,15 +2385,15 @@ local function IsBetterMeleeTarget(weapon, player, newTarget, target)
     local teamNumber = GetEnemyTeamNumber(player:GetTeamNumber())
 
     if IsPossibleMeleeTarget(player, newTarget, teamNumber) then
-    
+
         if not target or (not target:isa("Player") and newTarget:isa("Player")) then
             return true
         end
-        
+
     end
-    
+
     return false
-    
+
 end
 
 -- melee targets must be in front of the player
@@ -2090,28 +2424,28 @@ local kTraceOrder = { 4, 1, 3, 5, 7, 0, 2, 6, 8 }
  *
  * Basically, inside the range to the attackEndPoint, the attacker chooses the "best" target freely.
 --]]
- --[[
-  * Bullets are small and will hit exactly where you looked. 
-  * Melee, however, is different. We select targets from a volume, and we expect the melee'er to be able
-  * to basically select the "best" target from that volume. 
-  * Right now, the Trace methods available is limited (spheres or world-axis aligned boxes), so we have to
-  * compensate by doing multiple traces.
-  * We specify the size of the width and base height and its range.
-  * Then we split the space into 9 parts and trace/select all of them, choose the "best" target. If no good target is found,
-  * we use the middle trace for effects.
- --]]
+--[[
+ * Bullets are small and will hit exactly where you looked.
+ * Melee, however, is different. We select targets from a volume, and we expect the melee'er to be able
+ * to basically select the "best" target from that volume.
+ * Right now, the Trace methods available is limited (spheres or world-axis aligned boxes), so we have to
+ * compensate by doing multiple traces.
+ * We specify the size of the width and base height and its range.
+ * Then we split the space into 9 parts and trace/select all of them, choose the "best" target. If no good target is found,
+ * we use the middle trace for effects.
+--]]
 function CheckMeleeCapsule(weapon, player, damage, range, optionalCoords, traceRealAttack, scale, priorityFunc, filter, mask)
 
     scale = scale or 1
 
     local eyePoint = player:GetEyePos()
-    
-    if not teamNumber then
-        teamNumber = GetEnemyTeamNumber( player:GetTeamNumber() )
-    end
-    
+
+    -- if not teamNumber then
+    --     teamNumber = GetEnemyTeamNumber( player:GetTeamNumber() )
+    -- end
+
     mask = mask or PhysicsMask.Melee
-    
+
     local coords = optionalCoords or player:GetViewAngles():GetCoords()
     local axis = coords.zAxis
     local forwardDirection = Vector(coords.zAxis)
@@ -2120,51 +2454,51 @@ function CheckMeleeCapsule(weapon, player, damage, range, optionalCoords, traceR
     if forwardDirection:GetLength() ~= 0 then
         forwardDirection:Normalize()
     end
-    
+
     local width, height = weapon:GetMeleeBase()
     width = scale * width
     height = scale * height
-    
+
     --[[
     if Client then
         Client.DebugCapsule(eyePoint, eyePoint + axis * range, width, 0, 3)
     end
    --]]
-    
-   -- extents defines a world-axis aligned box, so x and z must be the same. 
+
+    -- extents defines a world-axis aligned box, so x and z must be the same.
     local extents = Vector(width / 6, height / 6, width / 6)
     if not filter then
         filter = EntityFilterOne(player)
     end
     local middleTrace,middleStart
     local target,endPoint,surface,startPoint
-    
+
     if not priorityFunc then
         priorityFunc = IsBetterMeleeTarget
     end
-    
-    local selectedTrace = nil
-    
+
+    local selectedTrace
+
     for _, pointIndex in ipairs(kTraceOrder) do
-    
+
         local dx = pointIndex % 3 - 1
         local dy = math.floor(pointIndex / 3) - 1
         local point = eyePoint + coords.xAxis * (dx * width / 3) + coords.yAxis * (dy * height / 3)
         local trace, sp, ep = TraceMeleeBox(weapon, point, axis, extents, range, mask, filter)
-        
+
         if dx == 0 and dy == 0 then
             middleTrace, middleStart = trace, sp
             selectedTrace = trace
         end
-        
+
         if trace.entity and priorityFunc(weapon, player, trace.entity, target) and IsNotBehind(eyePoint, trace.endPoint, forwardDirection) then
-        
+
             selectedTrace = trace
             target = trace.entity
             startPoint = sp
             endPoint = trace.endPoint
             surface = trace.surface
-            
+
             surface = GetIsAlienUnit(target) and "organic" or "metal"
             if GetAreEnemies(player, target) then
                 if target:isa("Alien") then
@@ -2172,31 +2506,31 @@ function CheckMeleeCapsule(weapon, player, damage, range, optionalCoords, traceR
                 elseif target:isa("Marine") then
                     surface = "flesh"
                 else
-                
+
                     if HasMixin(target, "Team") then
                         if target:GetTeamType() == kAlienTeamType then
                             surface = "organic"
                         else
                             surface = "metal"
                         end
-                        
+
                     end
-                
+
                 end
             end
         end
-        
+
     end
-    
-   -- if we have not found a target, we use the middleTrace to possibly bite a wall (or when cheats are on, teammates)
+
+    -- if we have not found a target, we use the middleTrace to possibly bite a wall (or when cheats are on, teammates)
     target = target or middleTrace.entity
     endPoint = endPoint or middleTrace.endPoint
     surface = surface or middleTrace.surface
     startPoint = startPoint or middleStart
-    
+
     local direction = target and (endPoint - startPoint):GetUnit() or coords.zAxis
     return target ~= nil or middleTrace.fraction < 1, target, endPoint, direction, surface, startPoint, selectedTrace
-    
+
 end
 
 local kNumMeleeZones = 3
@@ -2241,41 +2575,60 @@ function AttackMeleeCapsule(weapon, player, damage, range, optionalCoords, altMo
 
     local targets = {}
     local didHit, target, endPoint, direction, surface, startPoint, trace
-    
+
     if not filter then
         filter = EntityFilterTwo(player, weapon)
     end
 
-   -- loop upto 20 times just to go through any soft targets. 
-   -- Stops as soon as nothing is hit or a non-soft target is hit
+    -- loop upto 20 times just to go through any soft targets.
+    -- Stops as soon as nothing is hit or a non-soft target is hit
     for i = 1, 20 do
-    
+
         local traceFilter = function(test)
             return EntityFilterList(targets)(test) or filter(test)
         end
-    
-       -- Enable tracing on this capsule check, last argument.
+
+        -- Enable tracing on this capsule check, last argument.
         didHit, target, endPoint, direction, surface, startPoint, trace = CheckMeleeCapsule(weapon, player, damage, range, optionalCoords, true, 1, nil, traceFilter)
-        local alreadyHitTarget = target ~= nil and table.contains(targets, target)
+        local alreadyHitTarget = target ~= nil and table.icontains(targets, target)
 
         if didHit and not alreadyHitTarget then
             weapon:DoDamage(damage, target, endPoint, direction, surface, altMode)
         end
-        
+
         if target and not alreadyHitTarget then
             table.insert(targets, target)
         end
-        
+
         if not target or not HasMixin(target, "SoftTarget") then
             break
         end
-    
+
     end
-    
+
     HandleHitregAnalysis(player, startPoint, endPoint, trace)
-    
-    return didHit, targets[#targets], endPoint, surface
-    
+
+    local lastTarget = targets[#targets]
+
+    -- Handle Stats
+    if Server then
+
+        local parent = weapon and weapon.GetParent and weapon:GetParent()
+        if parent and weapon.GetTechId then
+
+            -- Drifters, buildings and teammates don't count towards accuracy as hits or misses
+            if (lastTarget and lastTarget:isa("Player") and GetAreEnemies(parent, lastTarget)) or lastTarget == nil then
+
+                local steamId = parent:GetSteamId()
+                if steamId then
+                    StatsUI_AddAccuracyStat(steamId, weapon:GetTechId(), lastTarget ~= nil, lastTarget and lastTarget:isa("Onos"), weapon:GetParent():GetTeamNumber())
+                end
+            end
+        end
+    end
+
+    return didHit, lastTarget, endPoint, surface
+
 end
 
 local kExplosionDirections =
@@ -2450,7 +2803,7 @@ function GetEventTimingString(seconds)
     local logTime = Shared.GetTime() - seconds
     
     local count = 0
-    for index, time in ipairs(gEventTiming) do
+    for _, time in ipairs(gEventTiming) do
     
         if time >= logTime then
             count = count + 1
@@ -2474,7 +2827,7 @@ if Client then
 
     local kMaxPitch = Math.Radians(89.9)
     function ClampInputPitch(input)
-        input.pitch = Math.Clamp(input.pitch, -kMaxPitch, kMaxPitch)
+        input.pitch = Clamp(input.pitch, -kMaxPitch, kMaxPitch)
     end
     
    -- &ol& = order location
@@ -2535,7 +2888,7 @@ function TraceBullet(player, weapon, startPoint, direction, throughHallucination
         
         if trace.fraction ~= 1 then
         
-            table.insertunique(hitInfo, { EndPoint = trace.endPoint, Entity = trace.entity } )
+            table.insert(hitInfo, { EndPoint = trace.endPoint, Entity = trace.entity } )
 
             if trace.entity and (trace.entity:isa("Hallucination") and throughHallucinations == true) or throughUnits == true then
                 startPoint = Vector(trace.endPoint)
@@ -2561,6 +2914,7 @@ function CommaValue(amount)
     if amount ~= nil then
         formatted = amount
         while true do  
+            local k
             formatted, k = string.gsub(formatted, "^(-?%d+)(%d%d%d)", '%1,%2')
             if (k==0) then
                 break
@@ -2625,7 +2979,7 @@ function GetTexCoordsForTechId(techId)
         
        -- marine weapons
         gTechIdPosition[kTechId.Rifle] = kDeathMessageIcon.Rifle
-        gTechIdPosition[kTechId.HeavyRifle] = kDeathMessageIcon.Rifle
+        gTechIdPosition[kTechId.HeavyMachineGun] = kDeathMessageIcon.HeavyMachineGun
         gTechIdPosition[kTechId.Pistol] = kDeathMessageIcon.Pistol
         gTechIdPosition[kTechId.Axe] = kDeathMessageIcon.Axe
         gTechIdPosition[kTechId.Shotgun] = kDeathMessageIcon.Shotgun
@@ -2637,6 +2991,7 @@ function GetTexCoordsForTechId(techId)
         gTechIdPosition[kTechId.GasGrenade] = kDeathMessageIcon.GasGrenade
         gTechIdPosition[kTechId.PulseGrenade] = kDeathMessageIcon.PulseGrenade
         gTechIdPosition[kTechId.Exo] = kDeathMessageIcon.Crush
+        gTechIdPosition[kTechId.PowerSurge] = kDeathMessageIcon.EMPBlast
         
        -- alien abilities
         gTechIdPosition[kTechId.Bite] = kDeathMessageIcon.Bite
@@ -2667,7 +3022,7 @@ function GetTexCoordsForTechId(techId)
         gTechIdPosition[kTechId.Stomp] = kDeathMessageIcon.Stomp
         gTechIdPosition[kTechId.BoneShield] = kDeathMessageIcon.BoneShield
         
-        gTechIdPosition[kTechId.GorgeTunnelTech] = kDeathMessageIcon.GorgeTunnel
+        --gTechIdPosition[kTechId.GorgeTunnelTech] = kDeathMessageIcon.GorgeTunnel
         
     end
     
@@ -2739,7 +3094,7 @@ function GetSelectablesOnScreen(commander, className, minPos, maxPos)
     local teamNumber = commander:GetTeamNumber()
     local oppositeTeam = ConditionalValue(commander:GetTeamNumber() == kTeam1Index, kTeam2Index, kTeam1Index)
 
-    for _, teamNumber in pairs(team) do
+    for _, teamNumber in ipairs(team) do
         for _, selectable in ipairs(GetEntitiesWithMixinForTeam("Selectable", teamNumber)) do
 
             if selectable:isa(className) then
@@ -2770,7 +3125,7 @@ function GetInstalledMapList()
     local mapNames = { }
     local mapFiles = { }
     
-    for _, mapFile in pairs(matchingFiles) do
+    for _, mapFile in ipairs(matchingFiles) do
     
         local _, _, filename = string.find(mapFile, "maps/(.*).level")
         local mapname = string.gsub(filename, 'ns2_', '', 1):gsub("^%l", string.upper)
@@ -2791,7 +3146,7 @@ end
 -- TODO: move to Utility.lua
 
 function EntityFilterList(list)
-    return function(test) return table.contains(list, test) end
+    return function(test) return table.icontains(list, test) end
 end
 
 -- avoid problem with client generating a hit while server fails by shrinking client-side bullets a bit
@@ -2812,7 +3167,7 @@ function GetBulletTargets(startPoint, endPoint, spreadDirection, bulletSize, fil
     
     for i = 1, 20 do
     
-        local traceFilter = nil 
+        local traceFilter 
         if filter then
 
             traceFilter = function(test)
@@ -2833,16 +3188,23 @@ function GetBulletTargets(startPoint, endPoint, spreadDirection, bulletSize, fil
             
         end
         
-        if trace.entity and not table.contains(targets, trace.entity) then
+        if trace.entity and not table.icontains(targets, trace.entity) then
         
             table.insert(targets, trace.entity)
             table.insert(hitPoints, trace.endPoint)
             
         end
         
-        if (not trace.entity or not HasMixin(trace.entity, "SoftTarget")) or trace.fraction == 1 then
+        local deadTarget = trace.entity and HasMixin(trace.entity, "Live") and not trace.entity:GetIsAlive()
+        local softTarget = trace.entity and HasMixin(trace.entity, "SoftTarget")
+        local ragdollTarget = trace.entity and trace.entity:isa("Ragdoll")
+        if (not trace.entity or not (deadTarget or softTarget or ragdollTarget)) or trace.fraction == 1 then
             break
         end
+
+        -- if (deadTarget) then Log("Dead %s target, bullet is going forward", EntityToString(trace.entity)) end
+        -- if (soft) then Log("Soft %s target, bullet is going forward", EntityToString(trace.entity)) end
+        -- if (ragdollTarget) then Log("Ragdoll %s target, bullet is going forward", EntityToString(trace.entity)) end
     
     end
     
@@ -2993,45 +3355,83 @@ end
 
 function ValidateVariant( variants, variantType, enum, enumData )
     local idx = Client.GetOptionInteger(variantType, 1)
-    
-    if not enum[idx] then -- if it's an invalid id
+    local pvIdx = idx --cache incase not owned, for logging
+    if not rawget( enum, idx ) then -- if it's an invalid id
         Client.SetOptionInteger(variantType, 1) -- fix it
-        idx = 1 
-        HPrint( "Invalid ID on "..variantType )
+        idx = 1
+        HPrint( "Invalid ID on " .. variantType )
     elseif not GetHasVariant( enumData, idx ) then -- if they don't have access to this
         idx = 1 -- don't let them use it
-        HPrint( "No access to "..variantType.." "..idx )
+        HPrint( "No access to " .. variantType .. " " .. pvIdx )
     end
     
     variants[variantType] = idx
 end
-       
-        
+
 function GetAndSetVariantOptions()
 
     local variants = {}
-    
-    variants.sexType = Client.GetOptionString("sexType", "Male") 
-    
+
+    variants.sexType = Client.GetOptionString("sexType", "Male")
+
     ValidateShoulderPad(variants)
+
+    ValidateVariant(variants, "marineVariant",              kMarineVariants,             kMarineVariantsData)
+    ValidateVariant(variants, "skulkVariant",               kSkulkVariants,              kSkulkVariantsData)
+    ValidateVariant(variants, "gorgeVariant",               kGorgeVariants,              kGorgeVariantsData)
+    ValidateVariant(variants, "lerkVariant",                kLerkVariants,               kLerkVariantsData)
+    ValidateVariant(variants, "fadeVariant",                kFadeVariants,               kFadeVariantsData)
+    ValidateVariant(variants, "onosVariant",                kOnosVariants,               kOnosVariantsData)
+    ValidateVariant(variants, "exoVariant",                 kExoVariants,                kExoVariantsData)
+    ValidateVariant(variants, "rifleVariant",               kRifleVariants,              kRifleVariantsData)
+    ValidateVariant(variants, "pistolVariant",              kPistolVariants,             kPistolVariantsData)
+    ValidateVariant(variants, "axeVariant",                 kAxeVariants,                kAxeVariantsData)
+    ValidateVariant(variants, "shotgunVariant",             kShotgunVariants,            kShotgunVariantsData)
+    ValidateVariant(variants, "flamethrowerVariant",        kFlamethrowerVariants,       kFlamethrowerVariantsData)
+    ValidateVariant(variants, "grenadeLauncherVariant",     kGrenadeLauncherVariants,    kGrenadeLauncherVariantsData)
+    ValidateVariant(variants, "welderVariant",              kWelderVariants,             kWelderVariantsData)
+    ValidateVariant(variants, "hmgVariant",                 kHMGVariants,                kHMGVariantsData)
+    ValidateVariant(variants, "macVariant",                 kMarineMacVariants,          kMarineMacVariantsData)
+    ValidateVariant(variants, "arcVariant",                 kMarineArcVariants,          kMarineArcVariantsData)
+    ValidateVariant(variants, "marineStructuresVariant",    kMarineStructureVariants,    kMarineStructureVariantsData)
+    ValidateVariant(variants, "extractorVariant",           kExtractorVariants,          kExtractorVariantsData)
     
-    ValidateVariant(variants, "marineVariant",    kMarineVariant,     kMarineVariantData)
-    ValidateVariant(variants, "skulkVariant",     kSkulkVariant,      kSkulkVariantData)
-    ValidateVariant(variants, "gorgeVariant",     kGorgeVariant,      kGorgeVariantData)
-    ValidateVariant(variants, "lerkVariant",      kLerkVariant,       kLerkVariantData)
-    ValidateVariant(variants, "fadeVariant",      kFadeVariant,       kFadeVariantData)
-    ValidateVariant(variants, "onosVariant",      kOnosVariant,       kOnosVariantData)
-    ValidateVariant(variants, "exoVariant",       kExoVariant,        kExoVariantData)
-    ValidateVariant(variants, "rifleVariant",     kRifleVariant,      kRifleVariantData)
-    ValidateVariant(variants, "shotgunVariant",   kShotgunVariant,    kShotgunVariantData)    
-    
+    ValidateVariant(variants, "alienStructuresVariant",     kAlienStructureVariants,     kAlienStructureVariantsData)
+    ValidateVariant(variants, "harvesterVariant",           kHarvesterVariants,          kHarvesterVariantsData)
+    ValidateVariant(variants, "eggVariant",                 kEggVariants,                kEggVariantsData)
+    ValidateVariant(variants, "alienTunnelsVariant",        kAlienTunnelVariants,        kAlienTunnelVariantsData)
+    ValidateVariant(variants, "cystVariant",                kAlienCystVariants,          kAlienCystVariantsData)
+    ValidateVariant(variants, "drifterVariant",             kAlienDrifterVariants,       kAlienDrifterVariantsData)
+
+    ValidateVariant(variants, "clogVariant",                kClogVariants,               kClogVariantsData)
+    ValidateVariant(variants, "hydraVariant",               kHydraVariants,              kHydraVariantsData)
+    ValidateVariant(variants, "babblerVariant",             kBabblerVariants,            kBabblerVariantsData)
+    ValidateVariant(variants, "babblerEggVariant",          kBabblerEggVariants,         kBabblerEggVariantsData)
+        
     return variants
-    
+
+end
+
+function SendPlayerCallingCardUpdate()
+
+    if Client.GetIsConnected() then
+
+        local newCallingCard = Client.GetOptionInteger(kCallingCardOptionKey, kDefaultPlayerCallingCard)
+        Client.SendNetworkMessage("SetPlayerCallingCard",
+        {
+            callingCard = newCallingCard
+        })
+
+    end
+
 end
 
 function SendPlayerVariantUpdate()
-    local options = GetAndSetVariantOptions()
-    if MainMenu_IsInGame and MainMenu_IsInGame() then
+
+    if Client.GetIsConnected() then
+        
+        local options = GetAndSetVariantOptions()
+        
         Client.SendNetworkMessage("SetPlayerVariant",
             {
                 marineVariant = options.marineVariant,
@@ -3044,22 +3444,45 @@ function SendPlayerVariantUpdate()
                 shoulderPadIndex = options.shoulderPadIndex,
                 exoVariant = options.exoVariant,
                 rifleVariant = options.rifleVariant,
+                pistolVariant = options.pistolVariant,
+                axeVariant = options.axeVariant,
                 shotgunVariant = options.shotgunVariant,
+                flamethrowerVariant = options.flamethrowerVariant,
+                grenadeLauncherVariant = options.grenadeLauncherVariant,
+                welderVariant = options.welderVariant,
+                hmgVariant = options.hmgVariant,
+                macVariant = options.macVariant,
+                arcVariant = options.arcVariant,
+                marineStructuresVariant = options.marineStructuresVariant,
+                extractorVariant = options.extractorVariant,
+
+                alienStructuresVariant = options.alienStructuresVariant,
+                harvesterVariant = options.harvesterVariant,
+                eggVariant = options.eggVariant,
+                cystVariant = options.cystVariant,
+                drifterVariant = options.drifterVariant,
+                alienTunnelsVariant = options.alienTunnelsVariant,
+
+                clogVariant = options.clogVariant,
+                hydraVariant = options.hydraVariant,
+                babblerVariant = options.babblerVariant,
+                babblerEggVariant = options.babblerEggVariant,
             },
             true)
     end
 end
 
-local function OnInventoryUpdated()
-    SendPlayerVariantUpdate()
-
-    --Load up the customize menu
-    local MainMenu = Client and GetGUIMainMenu and GetGUIMainMenu()
-    if MainMenu then
-        MainMenu:OnInventoryUpdated()
+function CheckCollectableAchievement()
+    if Client.IsInventoryLoaded() then
+        for _, itemId in ipairs(kCollectableItemIds) do
+            if not GetOwnsItem( itemId ) then
+                return
+            end
+        end
+        Client.SetAchievement('Economy_0_1')
     end
 end
-Event.Hook("InventoryUpdated", OnInventoryUpdated)
+
 
 ------------------------------------------
 --  This will return nil if the asset DNE
@@ -3088,4 +3511,57 @@ function PrecacheAssetSafe( path, fallback )
         return PrecacheAsset(fallback)
     end
 
+end
+
+function GetPlayerSkillTier(skill, isRookie, adagradSum, isBot) --TODO-HIVE Update for Team-context
+    if isBot then return -1, "SKILLTIER_BOT" end
+    if isRookie then return 0, "SKILLTIER_ROOKIE", 0 end
+    if not skill or skill == -1 then return -2, "SKILLTIER_UNKNOWN" end
+
+    if adagradSum then
+        -- capping the skill values using sum of squared adagrad gradients
+        -- This should stop the skill tier from changing too often for some players due to short term trends
+        -- The used factor may need some further adjustments
+        if adagradSum <= 0 then
+            skill = 0
+        else
+            skill = math.max(skill - 25 / math.sqrt(adagradSum), 0)
+        end
+    end
+
+    if skill <= 300 then return 1, "SKILLTIER_RECRUIT", skill end
+    if skill <= 750 then return 2, "SKILLTIER_FRONTIERSMAN", skill end
+    if skill <= 1400 then return 3, "SKILLTIER_SQUADLEADER", skill end
+    if skill <= 2100 then return 4, "SKILLTIER_VETERAN", skill end
+    if skill <= 2900 then return 5, "SKILLTIER_COMMANDANT", skill end
+    if skill <= 4100 then return 6, "SKILLTIER_SPECIALOPS", skill end
+    return 7, "SKILLTIER_SANJISURVIVOR", skill
+end
+
+local kSkillTierToDescMap =
+{
+    [-1] = "SKILLTIER_BOT",
+    [ 0] = "SKILLTIER_ROOKIE",
+    [ 1] = "SKILLTIER_RECRUIT",
+    [ 2] = "SKILLTIER_FRONTIERSMAN",
+    [ 3] = "SKILLTIER_SQUADLEADER",
+    [ 4] = "SKILLTIER_VETERAN",
+    [ 5] = "SKILLTIER_COMMANDANT",
+    [ 6] = "SKILLTIER_SPECIALOPS",
+    [ 7] = "SKILLTIER_SANJISURVIVOR",
+    unknown = "SKILLTIER_UNKNOWN",
+}
+
+function GetSkillTierDescription(tier)
+    assert(type(tier) == "number")
+    return kSkillTierToDescMap[tier] or kSkillTierToDescMap.unknown
+end
+
+local warmupActive = false
+function SetWarmupActive(active)
+    warmupActive = active
+end
+
+function GetWarmupActive()
+    return warmupActive
 end
