@@ -1,23 +1,23 @@
-// ======= Copyright (c) 2003-2012, Unknown Worlds Entertainment, Inc. All rights reserved. =====
-//
-// lua\Weapons\Marine\RailPistol.lua
-//
-//    Created by:   Brian Cronin (brianc@unknownworlds.com)
-//
-// ========= For more information, visit us at http://www.unknownworlds.com =====================
+-- ======= Copyright (c) 2003-2012, Unknown Worlds Entertainment, Inc. All rights reserved. =====
+--
+-- lua\Weapons\Marine\RailPistol.lua
+--
+--    Created by:   Brian Cronin (brianc@unknownworlds.com)
+--
+-- ========= For more information, visit us at http:--www.unknownworlds.com =====================
 Script.Load("lua/PointGiverMixin.lua")
 Script.Load("lua/EffectsMixin.lua")
 Script.Load("lua/Weapons/ClientWeaponEffectsMixin.lua")
 
 class 'RailPistol' (ClipWeapon)
 
-RailPistol.kMapName = "railpistol"
+RailPistol.kMapName = "railpistol"`
 
 local kModelName = PrecacheAsset("models/marine/welder/builder.model")
 local kViewModels = GenerateMarineViewModelPaths("welder")
 local kAnimationGraph = PrecacheAsset("models/marine/exosuit/exosuit_rr_view.animation_graph")
 local kChargeTime = 2
-// The RailPistol will automatically shoot if it is charged for too long.
+-- The RailPistol will automatically shoot if it is charged for too long.
 local kChargeForceShootTime = 2.2
 local kRailPistolRange = 400
 local kRailPistolSpread = Math.Radians(0)
@@ -85,7 +85,7 @@ function RailPistol:OnDraw(player, previousWeaponMapName)
 
     ClipWeapon.OnDraw(self, player, previousWeaponMapName)
     
-    // Attach weapon to parent's hand
+    -- Attach weapon to parent's hand
     self:SetAttachPoint(ClipWeapon.kHumanAttachPoint)
     
 end
@@ -245,7 +245,7 @@ end
 
 local function ExecuteShot(self, startPoint, endPoint, player)
 
-    // Filter ourself out of the trace so that we don't hit ourselves.
+    -- Filter ourself out of the trace so that we don't hit ourselves.
     local filter = EntityFilterTwo(player, self)
     local trace = Shared.TraceRay(startPoint, endPoint, CollisionRep.Damage, PhysicsMask.Bullets, EntityFilterAllButIsa("Tunnel"))
     local hitPointOffset = trace.normal * 0.3
@@ -256,7 +256,7 @@ local function ExecuteShot(self, startPoint, endPoint, player)
     
     if trace.fraction < 1 then
     
-        // do a max of 10 capsule traces, should be sufficient
+        -- do a max of 10 capsule traces, should be sufficient
         local hitEntities = {}
         for i = 1, 20 do
         
@@ -276,12 +276,12 @@ local function ExecuteShot(self, startPoint, endPoint, player)
                 break
             end
             
-            // use new start point
+            -- use new start point
             startPoint = Vector(capsuleTrace.endPoint) + direction * extents.x * 3
         
         end
         
-        // for tracer
+        -- for tracer
         local effectFrequency = self:GetTracerEffectFrequency()
         local showTracer = ConditionalValue(GetIsVortexed(player), false, math.random() < effectFrequency)
         self:DoDamage(0, nil, trace.endPoint + hitPointOffset, direction, trace.surface, false, showTracer)
@@ -302,8 +302,8 @@ local function Shoot(self)
 
     local player = self:GetParent()
     
-    // We can get a shoot tag even when the clip is empty if the frame rate is low
-    // and the animation loops before we have time to change the state.
+    -- We can get a shoot tag even when the clip is empty if the frame rate is low
+    -- and the animation loops before we have time to change the state.
     if player then
    
         player:TriggerEffects("railgun_attack")
@@ -441,7 +441,7 @@ if Client then
         
         if player then
     
-            // trace and highlight first target
+            -- trace and highlight first target
             local filter = EntityFilterAllButMixin("RailgunTarget")
             local startPoint = player:GetEyePos()
             local endPoint = startPoint + player:GetViewCoords().zAxis * kRailPistolRange

@@ -327,74 +327,72 @@ function Marine:AttemptToBuy(techIds)
         return true
     end
     
-        local mapName = LookupTechData(techId, kTechDataMapName)
+    local mapName = LookupTechData(techId, kTechDataMapName)
+    
+    if mapName then
+    
+        Shared.PlayPrivateSound(self, Marine.kSpendResourcesSoundName, nil, 1.0, self:GetOrigin())
         
-        if mapName then
-        
-            Shared.PlayPrivateSound(self, Marine.kSpendResourcesSoundName, nil, 1.0, self:GetOrigin())
-            
-            if self:GetTeam() and self:GetTeam().OnBought then
-                self:GetTeam():OnBought(techId)
-            end
-                   
-            if techId == kTechId.Jetpack then
-
-                -- Need to apply this here since we change the class.
-                self:AddResources(-GetCostForTech(techId))
-                self:GiveJetpack()
+        if self:GetTeam() and self:GetTeam().OnBought then
+            self:GetTeam():OnBought(techId)
+        end
                 
-            elseif kIsExoTechId[techId] then
-                BuyExo(self, techId)    
-            else
+        if techId == kTechId.Jetpack then
+
+            -- Need to apply this here since we change the class.
+            self:AddResources(-GetCostForTech(techId))
+            self:GiveJetpack()
             
-                -- Make sure we're ready to deploy new weapon so we switch to it properly.
-                local newItem = self:GiveItem(mapName)
-                if newItem then
+        elseif kIsExoTechId[techId] then
+            BuyExo(self, techId)    
+        else
+        
+            -- Make sure we're ready to deploy new weapon so we switch to it properly.
+            local newItem = self:GiveItem(mapName)
+            if newItem then
 
-                    if newItem.UpdateWeaponSkins then
-                        -- Apply weapon variant
-                        newItem:UpdateWeaponSkins( self:GetClient() )
-                    end
+                if newItem.UpdateWeaponSkins then
+                    -- Apply weapon variant
+                    newItem:UpdateWeaponSkins( self:GetClient() )
+                end
 
-                    self:TriggerEffects("marine_weapon_pickup", { effecthostcoords = self:GetCoords() })
+                self:TriggerEffects("marine_weapon_pickup", { effecthostcoords = self:GetCoords() })
 
-                    if Server then
+                if Server then
 
-                        -- Destroy any dropped weapons that are free, are the same weapon, and that we are the previous owner.
-                        -- This is to stop spamming "free" weapons like Rifle from being bought repeatedly at the armory.
-                        local cost = LookupTechData(newItem:GetTechId(), kTechDataCostKey, 0)
-                        if cost <= 0 then
+                    -- Destroy any dropped weapons that are free, are the same weapon, and that we are the previous owner.
+                    -- This is to stop spamming "free" weapons like Rifle from being bought repeatedly at the armory.
+                    local cost = LookupTechData(newItem:GetTechId(), kTechDataCostKey, 0)
+                    if cost <= 0 then
 
-                            local filterFunction = CLambda [=[
-                            (...):GetWeaponWorldState() and
-                            (...).prevOwnerId == self[1]
-                            ]=] {self:GetId()}
+                        local filterFunction = CLambda [=[
+                        (...):GetWeaponWorldState() and
+                        (...).prevOwnerId == self[1]
+                        ]=] {self:GetId()}
 
-                            local weapons = Shared.GetEntitiesWithClassname(newItem:GetClassName())
-                            weapons = GetEntitiesWithFilter(weapons, filterFunction)
+                        local weapons = Shared.GetEntitiesWithClassname(newItem:GetClassName())
+                        weapons = GetEntitiesWithFilter(weapons, filterFunction)
 
-                            for i = 1, #weapons do
-                                local weapon = weapons[i]
-                                if weapon then
-                                    DestroyEntity(weapon)
-                                end
+                        for i = 1, #weapons do
+                            local weapon = weapons[i]
+                            if weapon then
+                                DestroyEntity(weapon)
                             end
-
                         end
 
                     end
 
-                    return true
-                    
                 end
+
+                return true
                 
             end
             
-            return false
-            
         end
         
-    end 
+        return false
+        
+    end
     
     return false
     

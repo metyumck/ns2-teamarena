@@ -323,32 +323,6 @@ function Marine:OnUpdateRender()
     end
     --]]
 
-function Marine:AddNotification(locationId, techId)
-
-    local locationName = ""
-
-    if locationId ~= 0 then
-        locationName = Shared.GetString(locationId)
-    end
-
-    table.insert(self.notifications, { LocationName = locationName, TechId = techId })
-
-end
-
--- this function returns the oldest notification and clears it from the list
-function Marine:GetAndClearNotification()
-
-    local notification = nil
-
-    if table.count(self.notifications) > 0 then
-    
-        notification = { LocationName = self.notifications[1].LocationName, TechId = self.notifications[1].TechId }
-        table.remove(self.notifications, 1)
-    
-    end
-    
-    return notification
-
 end
 
 function Marine:TriggerFootstep()

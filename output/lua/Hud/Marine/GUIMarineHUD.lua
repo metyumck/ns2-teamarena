@@ -306,16 +306,38 @@ self.scanLeft:SetTexturePixelCoordinates(GUIUnpackCoords(GUIMarineHUD.kScanLineT
     style.textColor = kBrightColor
     style.textureSet = "marine"
     style.displayTeamRes = true
-    self.resourceDisplay = CreatePlayerResourceDisplay(self, kGUILayerPlayerHUDForeground1, self.background, style)
+    self.resourceDisplay = CreatePlayerResourceDisplay(self, kGUILayerPlayerHUDForeground1, self.background, style, kTeam1Index)
     self.fuelDisplay = CreateFuelDisplay(self, kGUILayerPlayerHUDForeground1, self.background)
     self.inventoryDisplay = CreateInventoryDisplay(self, kGUILayerPlayerHUDForeground1, self.background)
+
+    self.gameTime = self:CreateAnimatedTextItem()
+    self.gameTime:SetFontName(GUIMarineHUD.kTextFontName)
+    self.gameTime:SetFontIsBold(true)
+    self.gameTime:SetLayer(kGUILayerPlayerHUDForeground2)
+    self.gameTime:SetColor(kBrightColor)
+    self.gameTime:SetScale(GetScaledVector()*1.15)
+    self.background:AddChild(self.gameTime)
+
+    self.teamResText = self:CreateAnimatedTextItem()
+    self.teamResText:SetAnchor(GUIItem.Left, GUIItem.Top)
+    self.teamResText:SetTextAlignmentX(GUIItem.Align_Min)
+    self.teamResText:SetTextAlignmentY(GUIItem.Align_Min)
+    self.teamResText:SetColor(style.textColor)
+    self.teamResText:SetBlendTechnique(GUIItem.Add)
+    self.teamResText:SetFontIsBold(true)
+    self.teamResText:SetFontName(GUIPlayerResource.kTresTextFontName)
+    self.background:AddChild(self.teamResText)
     
     self.commanderNameIsAnimating = nil
     
     UpdateItemsGUIScale(self)
     
     self:Reset()
-    
+    self.visible = true
+    self.statusDisplayVisible = true
+    self.frameVisible = true
+    self.inventoryDisplayVisible = true
+
     self:Update(0)
     -- Fix bug where changing resolution displays health bars again for Exos
     local player = Client.GetLocalPlayer()
@@ -548,6 +570,25 @@ function GUIMarineHUD:Reset()
     self.commanderName:SetPosition(Vector(x, y, 0))
     self.commanderName:SetFontName(GUIMarineHUD.kTextFontName)
     GUIMakeFontScale(self.commanderName)
+    self.commanderName:SetIsVisible(not minimalHud)
+
+    if self.commanderName:GetIsVisible() then
+        y = y + 30
+    end
+
+    self.gameTime:SetPosition(Vector(x, y, 0))
+    GUIMakeFontScale(self.gameTime)
+    self.gameTime:SetIsVisible(not minimalHud)
+
+    if self.gameTime:GetIsVisible() then
+        y = y + 30
+    end
+
+    self.teamResText:SetScale(GetScaledVector())
+    self.teamResText:SetPosition(Vector(x, y, 0))
+    GUIMakeFontScale(self.teamResText)
+
+    self.teamResText:SetIsVisible(minimalHud)
     
     self.statusDisplay:Reset(self.scale)
     self.statusDisplays:Reset(self.scale)

@@ -616,6 +616,3 @@ kMarineWeaponEffects =
 }
 
 GetEffectManager():AddEffectData("MarineWeaponEffects", kMarineWeaponEffects)
-}
-
-GetEffectManager():AddEffectData("MarineWeaponEffects", kMarineWeaponEffects)

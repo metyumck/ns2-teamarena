@@ -128,19 +128,7 @@ function PlayingTeam:AddPlayer(player)
     
 end
 
-function PlayingTeam:OnCreate()
-
-    self.entityTechIds = {}
-    self.techIdCount = {}
-    Team.OnCreate(self)
-      
-end
-
 function PlayingTeam:OnInitialized()
-
-    self.entityTechIds = {}
-    self.techIdCount = {}
-
     Team.OnInitialized(self)
     
     self:InitTechTree()

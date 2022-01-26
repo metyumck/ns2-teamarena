@@ -10,7 +10,7 @@
 Script.Load("lua/Gamerules.lua")
 Script.Load("lua/dkjson.lua")
 Script.Load("lua/bots/BotTeamController.lua")
-Script.Load("lua/ServerSponitor.lua")
+--Script.Load("lua/ServerSponitor.lua")
 Script.Load("lua/PlayerRanking.lua")
 
 if Client then
@@ -124,9 +124,16 @@ if Server then
     
     function NS2Gamerules:ResetPlayerScores()
     
-        for _, player in ientitylist(Shared.GetEntitiesWithClassname("Player")) do
+        for _, player in ientitylist(Shared.GetEntitiesWithClassname("Player")) do      --FIXME This is setting enter times to invalid ranges (because round data is reset..thus, not releative to game-start)
             if player.ResetScores and player.client then
                 player:ResetScores()
+                self.playerRanking:SetEntranceTime( player, player:GetTeamNumber() )
+                
+                if player:isa("Commander") then
+                    Log("Set Commander[%s] game-start Enter time", player:GetId())
+                    self.playerRanking:SetCommanderEntranceTime( player, player:GetTeamNumber() )
+                end
+                
             end
         end
 
@@ -198,9 +205,6 @@ if Server then
         -- Calls SetGamerules()
         Gamerules.OnCreate(self)
 
-        self.sponitor = ServerSponitor()
-        self.sponitor:Initialize(self)
-        
         self.playerRanking = PlayerRanking()
         
         self.techPointRandomizer = Randomizer()
@@ -211,11 +215,9 @@ if Server then
         -- Create team objects
         self.team1 = self:BuildTeam(kTeam1Type)
         self.team1:Initialize(kTeam1Name, kTeam1Index)
-        self.sponitor:ListenToTeam(self.team1)
         
         self.team2 = self:BuildTeam(kTeam2Type)
         self.team2:Initialize(kTeam2Name, kTeam2Index)
-        self.sponitor:ListenToTeam(self.team2)
         
         self.worldTeam = ReadyRoomTeam()
         self.worldTeam:Initialize("World", kTeamReadyRoom)
@@ -283,9 +285,8 @@ if Server then
     
     function NS2Gamerules:OnCommanderLogout(commandStructure, oldCommander)
         if self.gameInfo:GetRookieMode() and self:GetGameState() > kGameState.NotStarted and
-                self:GetGameState() < kGameState.Team1Won and
-                not self.botTeamController:GetCommanderBot(commandStructure:GetTeamNumber()) then
-            OnConsoleAddBots(nil, 1, commandStructure:GetTeamNumber(), "com")
+                self:GetGameState() < kGameState.Team1Won then
+            self.botTeamController:UpdateBotsForTeam(commandStructure:GetTeamNumber())
         end
     end
 
@@ -594,6 +595,9 @@ if Server then
      ]]
     function NS2Gamerules:ResetGame()
 
+        StatsUI_ResetStats()
+
+        StatsUI_ResetStats()
    
         self:SetGameState(kGameState.NotStarted)
         
@@ -627,17 +631,14 @@ if Server then
             -- at the start of the next game, including the NS2Gamerules. This is how a map transition would have to work anyway.
             -- Do not destroy any entity that has a parent. The entity will be destroyed when the parent is destroyed or
             -- when the owner manually destroyes the entity.
-            local shieldTypes = { "GameInfo", "MapBlip", "NS2Gamerules", "PlayerInfoEntity" }
+            local shieldTypes = { "GameInfo", "MapBlip", "NS2Gamerules", "PlayerInfoEntity", "ThunderdomeRules" }
             local allowDestruction = true
             for i = 1, #shieldTypes do
                 allowDestruction = allowDestruction and not entity:isa(shieldTypes[i])
             end
             
             if allowDestruction and entity:GetParent() == nil then
-            
-                local isMapEntity = entity:GetIsMapEntity()
-                local mapName = entity:GetMapName()
-                
+                           
                 -- Reset all map entities and all player's that have a valid Client (not ragdolled players for example).
                 local resetEntity = entity:isa("TeamInfo") or entity:GetIsMapEntity() or (entity:isa("Player") and entity:GetClient() ~= nil)
                 if resetEntity then
@@ -659,7 +660,7 @@ if Server then
         
         -- Build list of tech points
         local techPoints = EntityListToTable(Shared.GetEntitiesWithClassname("TechPoint"))
-        if table.maxn(techPoints) < 2 then
+        if #techPoints < 2 then
             Print("Warning -- Found only %d %s entities.", table.maxn(techPoints), TechPoint.kMapName)
         end
         
@@ -669,12 +670,11 @@ if Server then
         end
         
         -- add obstacles for resource points back in
-        for index, resourcePoint in ientitylist(resourcePoints) do        
+        for _, resourcePoint in ientitylist(resourcePoints) do        
             resourcePoint:AddToMesh()        
         end
         
-        local team1TechPoint = nil
-        local team2TechPoint = nil
+        local team1TechPoint, team2TechPoint
         
         if Server.teamSpawnOverride and #Server.teamSpawnOverride > 0 then
            
@@ -768,16 +768,27 @@ if Server then
 		self.clientpres = {}
 		
         -- Create team specific entities
-        
-        
+        local commandStructure1 = self.team1:ResetTeam()
+        local commandStructure2 = self.team2:ResetTeam()
+           
         -- login the commanders again
         local function LoginCommander(commandStructure, client)
-	    local player = client and client:GetControllingPlayer()
-            if commandStructure and player then
+            local player = client and client:GetControllingPlayer()
+            
+            if commandStructure and player and commandStructure:GetIsBuilt() then
+                
 				-- make up for not manually moving to CS and using it
-				commandStructure.occupied = not client:GetIsVirtual()
-				player:SetOrigin(commandStructure:GetDefaultEntryOrigin())
-				commandStructure:LoginPlayer(player,true)
+                commandStructure.occupied = not client:GetIsVirtual()
+                
+                player:SetOrigin(commandStructure:GetDefaultEntryOrigin())
+                
+                commandStructure:LoginPlayer( player, true )
+            else
+                if player then
+                    Log("%s| Failed to Login commander[%s - %s(%s)] on ResetGame", self:GetClassName(), player:GetClassName(), player:GetId(),
+                        client:GetIsVirtual() and "BOT" or "HUMAN"
+                    )
+                end
             end
         end
         
@@ -805,8 +816,7 @@ if Server then
         self.team1:OnResetComplete()
         self.team2:OnResetComplete()
 
-
-        
+        StatsUI_InitializeTeamStatsAndTechPoints(self)       
     end
     
     function NS2Gamerules:GetIsVIPDead()
@@ -876,7 +886,7 @@ if Server then
         -- Check if the individual player's should be sent their own ping.
         if self.timeToSendIndividualPings == nil or now >= self.timeToSendIndividualPings then
         
-            for index, player in ientitylist(Shared.GetEntitiesWithClassname("Player")) do
+            for _, player in ientitylist(Shared.GetEntitiesWithClassname("Player")) do
                 Server.SendNetworkMessage(player, "Ping", BuildPingMessage(player:GetClientIndex(), player:GetPing()), false)
             end
             
@@ -887,7 +897,7 @@ if Server then
         -- Check if all player's pings should be sent to everybody.
         if self.timeToSendAllPings == nil or  now >= self.timeToSendAllPings then
         
-            for index, player in ientitylist(Shared.GetEntitiesWithClassname("Player")) do
+            for _, player in ientitylist(Shared.GetEntitiesWithClassname("Player")) do
                 Server.SendNetworkMessage("Ping", BuildPingMessage(player:GetClientIndex(), player:GetPing()), false)
             end
             
@@ -906,9 +916,9 @@ if Server then
             if spectators:GetSize() > 0 then
             
                 -- Send spectator all health
-                for index, player in ientitylist(Shared.GetEntitiesWithClassname("Player")) do
+                for _, player in ientitylist(Shared.GetEntitiesWithClassname("Player")) do
                 
-                    for index, spectator in ientitylist(spectators) do
+                    for _, spectator in ientitylist(spectators) do
                     
                         if not spectator:GetIsFirstPerson() then
                             Server.SendNetworkMessage(spectator, "Health", BuildHealthMessage(player), false)
@@ -957,7 +967,7 @@ if Server then
         
     end
         
-    function VotingConcedeVoteAllowed()
+    function NS2Gamerules:VotingConcedeVoteAllowed()
         local gameRules = GetGamerules()
         return gameRules:GetGameStarted() and Shared.GetTime() - gameRules:GetGameStartTime() > kMinTimeBeforeConcede
     end
@@ -967,7 +977,7 @@ if Server then
     
         if voteTechId == kTechId.VoteConcedeRound then
         
-            if VotingConcedeVoteAllowed() then
+            if self:VotingConcedeVoteAllowed() then
             
                 local team = player:GetTeam()
                 if team.VoteToGiveUp then
@@ -982,12 +992,12 @@ if Server then
             local playerIndex = (voteTechId - kTechId.VoteDownCommander1 + 1)        
             local commanders = GetEntitiesForTeam("Commander", player:GetTeamNumber())
             
-            if playerIndex <= table.count(commanders) then
+            if playerIndex <= table.icount(commanders) then
             
-                local target = commanders[playerIndex]
+                local targetCommander = commanders[playerIndex]
                 local team = player:GetTeam()
                 
-                if player and team.VoteToEjectCommander then
+                if player and team.VoteToEjectCommander then    --TD-TODO Review and verify this isn't open for abuse (ejecting the second people join, etc)
                     team:VoteToEjectCommander(player, targetCommander)
                 end
                 
@@ -1003,29 +1013,29 @@ if Server then
         
         -- Now allow script actors to hook post load
         local allScriptActors = Shared.GetEntitiesWithClassname("ScriptActor")
-        for index, scriptActor in ientitylist(allScriptActors) do
+        for _, scriptActor in ientitylist(allScriptActors) do
             scriptActor:OnMapPostLoad()
         end
         
     end
 
-    function NS2Gamerules:UpdateToReadyRoom()
+    local function MovePlayerToReadyRoom(player)
+        if not player:GetIsSpectator() then
+            GetGamerules():JoinTeam(player, kTeamReadyRoom)
+        end
+    end
+
+    function NS2Gamerules:UpdateToReadyRoom(force)
 
         local state = self:GetGameState()
-        if(state == kGameState.Team1Won or state == kGameState.Team2Won or state == kGameState.Draw) then
-        
-            if self.timeSinceGameStateChanged >= kTimeToReadyRoom then
-            
+        if(state == kGameState.Team1Won or state == kGameState.Team2Won or state == kGameState.Draw) and not GetConcedeSequenceActive() then
+            if force or self.timeSinceGameStateChanged >= kTimeToReadyRoom then
                 -- Force the commanders to logout before we spawn people
                 -- in the ready room
                 self:LogoutCommanders()
-        
+
                 -- Set all players to ready room team
-                local function SetReadyRoomTeam(player)
-                    player:SetCameraDistance(0)
-                    self:JoinTeam(player, kTeamReadyRoom)
-                end
-                Server.ForAllPlayers(SetReadyRoomTeam)
+                Server.ForAllPlayers(MovePlayerToReadyRoom)
 
                 -- Spawn them there and reset teams
                 self:ResetGame()
@@ -1038,37 +1048,42 @@ if Server then
     
     function NS2Gamerules:UpdateMapCycle()
     
-        if not Server.GetIsGatherReady() then
-    
-            if self.timeToCycleMap ~= nil and Shared.GetTime() >= self.timeToCycleMap then
+        if Shared.GetThunderdomeEnabled() then
+        --We never change maps automatically (cycled) in TD, only via map-votes. This may change in the future
+            return
+        end
 
-                MapCycle_CycleMap()               
-                self.timeToCycleMap = nil
-                
-            end
-        
+        if self.timeToCycleMap ~= nil and Shared.GetTime() >= self.timeToCycleMap then
+
+            MapCycle_CycleMap()
+            self.timeToCycleMap = nil
+
         end
         
     end
     
     -- Network variable type time has a maximum value it can contain, so reload the map if
     -- the age exceeds the limit and no game is going on.
-    local kMaxServerAgeBeforeMapChange = 36000
-    local function ServerAgeCheck(self)
+    NS2Gamerules.kMaxServerAgeBeforeMapChange = 36000
+    function NS2Gamerules:ServerAgeCheck()
     
-        if self.gameState ~= kGameState.Started and Shared.GetTime() > kMaxServerAgeBeforeMapChange then
+        if Shared.GetThunderdomeEnabled() then
+            return
+        end
+
+        if self.gameState ~= kGameState.Started and Shared.GetTime() > self.kMaxServerAgeBeforeMapChange then
             MapCycle_ChangeMap(Shared.GetMapName())
         end
         
     end
     
-    local function UpdateAutoTeamBalance(self, dt)
+    function NS2Gamerules:UpdateAutoTeamBalance(dt)
     
         local wasDisabled = false
         
         -- Check if auto-team balance should be enabled or disabled.
         -- Disable automatically if cheats are on so you can play against more bots
-        local autoTeamBalance = not Shared.GetCheatsEnabled() and Server.GetConfigSetting("auto_team_balance")
+        local autoTeamBalance = false -- disable for now
         if autoTeamBalance and autoTeamBalance.enabled then
         
             local enabledOnUnbalanceAmount = autoTeamBalance.enabled_on_unbalance_amount or 2
@@ -1267,51 +1282,11 @@ if Server then
         local actualPlayers = playersCount - #gServerBots
         return math.max(0, numClientsTotal - actualPlayers)
     end
-
-    local kTickCount = 0
-    local kTickTimeSum = 0
-    function NS2Gamerules:UpdatePerfTags(timePassed)
-
-        UpdateTag("tickrate_", math.floor(Server.GetFrameRate()))
-
-        kTickCount = kTickCount + 1
-        kTickTimeSum = kTickTimeSum + timePassed
-
-        local kTime = Shared.GetTime()
-        if not self.nextServerTickrateUpdate or self.nextServerTickrateUpdate < kTime then
-
-            kNextServerTickrateUpdate = Shared.GetTime() + 10
-            kTickCount = kTickCount / kTickTimeSum
-            kTickTimeSum = 1
-            --round it
-            local avgTickrate = string.format("%.0f", kTickCount)
-            UpdateTag("ServerTickrate", avgTickrate)
-            
-            self.nextServerTickrateUpdate = kTime + 10
-        end
-
-    end
-    
-    function NS2Gamerules:UpdateCustomNetworkSettings()
-
-        local kTime = Shared.GetTime()
-        if not self.nextTimeUpdateCustomNetworkSettings or self.nextTimeCustomNetworkSettings < kTime then
-            if  Server.GetSendrate() ~= 20 or Server.GetTickrate() ~= 30 or Shared.GetSettingsVariable( "mr" ) ~= "30.000000" or Shared.GetSettingsVariable("interp") ~= "0.100000" then
-                UpdateTag("custom_network_settings", "")
-            else 
-                RemoveTag("custom_network_settings")
-            end
-            self.nextTimeUpdateNetworkSettingsModded = kTime + 10
-        end
-
-    end
-    
+   
     function NS2Gamerules:OnUpdate(timePassed)
     
         PROFILE("NS2Gamerules:OnUpdate")
-        
-        GetEffectManager():OnUpdate(timePassed)
-        
+             
         if Server then
             
             if self.justCreated then
@@ -1340,8 +1315,8 @@ if Server then
                 self:UpdateTeamWonRound(timePassed)
                 self:UpdateToReadyRoom()
                 self:UpdateMapCycle()
-                ServerAgeCheck(self)
-                UpdateAutoTeamBalance(self, timePassed)
+                self:ServerAgeCheck()
+                self:UpdateAutoTeamBalance(timePassed)
                 
                 self.timeSinceGameStateChanged = self.timeSinceGameStateChanged + timePassed
                 
@@ -1356,17 +1331,13 @@ if Server then
                 
                 --CheckForNoCommander(self, self.team1, "MarineCommander")
                 --CheckForNoCommander(self, self.team2, "AlienCommander")
-                KillEnemiesNearCommandStructureInPreGame(self, timePassed)
+                self:KillEnemiesNearCommandStructureInPreGame(self, timePassed)
                 
                 self:UpdatePlayerSkill()
                 self:UpdateNumPlayersForScoreboard()
-                self:UpdatePerfTags(timePassed)
-                self:UpdateCustomNetworkSettings()
-                
+              
             end
 
-            self.sponitor:Update(timePassed)
-            self.gameInfo:SetIsGatherReady(Server.GetIsGatherReady())            
         end
         
     end
@@ -1472,7 +1443,6 @@ if Server then
             Shared.ConsoleCommand("p_endlog")
 
             if winningTeam then
-                self.sponitor:OnEndMatch(winningTeam)
                 self.playerRanking:EndGame(winningTeam)
             end
             TournamentModeOnGameEnd()
@@ -1484,12 +1454,10 @@ if Server then
     
     function NS2Gamerules:OnTournamentModeEnabled()
         self.tournamentMode = true
-        self.sponitor.tournamentMode = true
     end
     
     function NS2Gamerules:OnTournamentModeDisabled()
         self.tournamentMode = false
-        self.sponitor.tournamentMode = false
     end
     
     function NS2Gamerules:DrawGame()
@@ -1500,7 +1468,7 @@ if Server then
 
     function NS2Gamerules:GetTeam(teamNum)
 
-        local team = nil    
+        local team  
         if(teamNum == kTeamReadyRoom) then
             team = self.worldTeam
         elseif(teamNum == kTeam1Index) then
@@ -1536,25 +1504,37 @@ if Server then
     -- No enforced balanced teams on join as the auto team balance system balances teams.
     function NS2Gamerules:GetCanJoinTeamNumber(player, teamNumber)
 
+        local team1Players = self.team1:GetNumPlayers()
+        local team2Players = self.team2:GetNumPlayers()
+
+        local team1Number = self.team1:GetTeamNumber()
+        local team2Number = self.team2:GetTeamNumber()
+
+        -- Every check below is disabled with cheats enabled
+        if Shared.GetCheatsEnabled() then
+            return true
+        end
+
         local forceEvenTeams = Server.GetConfigSetting("force_even_teams_on_join")
         if forceEvenTeams then
         
-            local team1Players = self.team1:GetNumPlayers()
-            local team2Players = self.team2:GetNumPlayers()
-            
-            if (team1Players > team2Players) and (teamNumber == self.team1:GetTeamNumber()) then
-                return false, 0
-            elseif (team2Players > team1Players) and (teamNumber == self.team2:GetTeamNumber()) then
-                return false, 0
+            if (team1Players > team2Players) and (teamNumber == team1Number) then
+                Server.SendNetworkMessage(player, "JoinError", BuildJoinErrorMessage(0), true)
+                return false
+            elseif (team2Players > team1Players) and (teamNumber == team2Number) then
+                Server.SendNetworkMessage(player, "JoinError", BuildJoinErrorMessage(0), true)
+                return false
             end
-            
+
         end
 
-        if not Shared.GetCheatsEnabled() and not self.botTraining and player:GetPlayerLevel() ~= -1 then
-            if not self.gameInfo:GetRookieMode() and not playedTutorial[player:GetSteamId()] and player:GetPlayerLevel() < 1 then
-                return false, 1
-            elseif self.gameInfo:GetRookieMode() and player:GetPlayerLevel() >= kRookieLevel then
-                return false, 2
+        -- Scenario: Veteran tries to join a team at rookie only server
+        if teamNumber ~= kSpectatorIndex then --allow to spectate
+            local isRookieOnly = Server.IsDedicated() and not self.botTraining and self.gameInfo:GetRookieMode()
+
+            if isRookieOnly and player:GetSkillTier() > kRookieMaxSkillTier then
+                Server.SendNetworkMessage(player, "JoinError", BuildJoinErrorMessage(2), true)
+                return false
             end
         end
         
@@ -1568,10 +1548,9 @@ if Server then
     Server.HookNetworkMessage("PlayedTutorial", OnReceivedTutorialPlayed)
 
     function NS2Gamerules:GetCanSpawnImmediately()
-        return not self:GetGameStarted() or Shared.GetCheatsEnabled() or (Shared.GetTime() < (self.gameStartTime + kFreeSpawnTime))
+        return not self:GetGameStarted() or Shared.GetCheatsEnabled()
     end
-
-    function NS2Gamerules:SetMaxBots(newMax, com)
+        function NS2Gamerules:SetMaxBots(newMax, com)
         self.botTeamController:SetMaxBots(newMax, com)
         self.botTeamController:UpdateBots()
     end
@@ -1680,7 +1659,6 @@ if Server then
             
             newPlayer:TriggerEffects("join_team")
             
-            
             if success then
                 
                 local newPlayerClient = Server.GetOwner(newPlayer)
@@ -1782,7 +1760,7 @@ if Server then
     function NS2Gamerules:CheckGameStart()
     
         if self:GetGameState() == kGameState.NotStarted or self:GetGameState() == kGameState.PreGame then
-        
+    
             -- Start pre-game when both teams have 2 players
             
             local team1Count = self.team1:GetNumPlayers()
@@ -2185,7 +2163,6 @@ if Server then
                 
                 --self:SetGameState(kGameState.Started)
                 StartBuytime(self)
-                self.sponitor:OnStartMatch()
                 self.playerRanking:StartGame()
                 
             end

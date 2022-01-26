@@ -2192,9 +2192,6 @@ function Player:SendKeyEvent(key, down)
                 return true 
             elseif GetIsBinding(key, "LastUpgrades") then
                 Shared.ConsoleCommand("evolvelastupgrades")    
-            elseif GetIsBinding(key, "ToggleMinimapNames") then
-                local newValue = not Client.GetOptionBoolean("minimapNames", true)
-                Client.SetOptionBoolean("minimapNames", newValue)
             elseif GetIsBinding(key, "Use") and Player_CanThrowObject( self ) then
                 Shared.ConsoleCommand("throwobject " .. GetSeason())
             end

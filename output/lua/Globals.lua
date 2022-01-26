@@ -155,7 +155,7 @@ kHitEffectMaxPosition = 1638 -- used for precision in hiteffect message
 kTracerSpeed = 115
 kMaxHitEffectsPerSecond = 25
 
-kPlayerStatus = enum( { "Hidden", "Dead", "Evolving", "Embryo", "Commander", "Exo", "GrenadeLauncher", "Rifle", "HeavyMachineGun", "Shotgun", "Flamethrower", "Void", "Spectator", "Skulk", "Gorge", "Fade", "Lerk", "Onos", "SkulkEgg", "GorgeEgg", "FadeEgg", "LerkEgg", "OnosEgg" } )
+kPlayerStatus = enum( { "Hidden", "Dead", "Evolving", "Embryo", "Commander", "VIP", "Exo", "GrenadeLauncher", "Rifle", "HeavyMachineGun", "Shotgun", "Flamethrower", "Void", "Spectator", "Skulk", "Gorge", "Fade", "Lerk", "Onos", "SkulkEgg", "GorgeEgg", "FadeEgg", "LerkEgg", "OnosEgg" } )
 kPlayerCommunicationStatus = enum( {'None', 'Voice', 'Typing', 'Menu'} )
 kSpectatorMode = enum( { 'FreeLook', 'Overhead', 'Following', 'FirstPerson', 'KillCam' } )
 
@@ -192,7 +192,7 @@ kMinimapBlipType = enum( { 'Undefined', 'TechPoint', 'ResourcePoint', 'Scan', 'E
     'Hive', 'Harvester', 'Hydra', 'Egg', 'Embryo', 'Crag', 'Whip', 'Shade', 'Shift', 'Shell', 'Veil', 'Spur', 'TunnelEntrance', 'BoneWall',
     'Marine', 'JetpackMarine', 'Exo', 'Skulk', 'Lerk', 'Onos', 'Fade', 'Gorge',
     'Door', 'PowerPoint', 'DestroyedPowerPoint', 'UnsocketedPowerPoint',
-    'BlueprintPowerPoint', 'ARC', 'Drifter', 'MAC', 'Infestation', 'InfestationDying', 'MoveOrder', 'AttackOrder', 'BuildOrder', 'SensorBlip', 'SentryBattery' } )
+    'BlueprintPowerPoint', 'ARC', 'Drifter', 'MAC', 'Infestation', 'InfestationDying', 'VIP', 'MoveOrder', 'AttackOrder', 'BuildOrder', 'SensorBlip', 'SentryBattery' } )
 
 -- Friendly IDs
 -- 0 = friendly

@@ -39,9 +39,9 @@ function TechTree:SendTechTreeBase(player)
         -- so players are always able to buy weapons, use commander mode, etc.
         Server.SendNetworkMessage(player, "ClearTechTree", {}, true)
 
-        for _, nodeTechId in ipairs(self.techIdList) do
+        for _, nodeTech in ipairs(self.nodeList) do
 
-            local techNode = self:GetTechNode(nodeTechId)
+            local techNode = self:GetTechNode(nodeTech:GetTechId())
         
             Server.SendNetworkMessage(player, "TechNodeBase", BuildTechNodeBaseMessage(techNode), true)
 
@@ -53,6 +53,36 @@ function TechTree:SendTechTreeBase(player)
     
     return sent
     
+end
+
+function TechTree:CopyDataFrom(techTree)
+
+    self.nodeList = {}
+    -- Deep clone the node list.
+	local index, oldTechNode = next(techTree.nodeList, nil)
+	while index do
+		local techId = oldTechNode:GetTechId()
+		local newTechNode = TechNode()
+		newTechNode:CopyDataFrom(oldTechNode)
+		self.nodeList[techId] = newTechNode
+		index, oldTechNode = next(techTree.nodeList, index)
+	end
+
+    self.techChanged = techTree.techChanged
+    self.complete = techTree.complete
+
+    -- No need to add to team
+    self.teamNumber = techTree.teamNumber
+
+    if Server then
+        self.techNodesChanged = {}
+		self.upgradedTechIdsSupporting = {}
+
+		-- Deep clone the supporting techId list.
+		for i,v in pairs(techTree.upgradedTechIdsSupporting) do
+			table.insert(self.upgradedTechIdsSupporting, i, techTree.upgradedTechIdsSupporting[i])
+		end	
+    end
 end
 
 function TechTree:SendTechTreeUpdates(playerList)

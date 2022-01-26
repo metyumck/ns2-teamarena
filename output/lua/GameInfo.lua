@@ -293,10 +293,6 @@ function GameInfo:GetAlienWins()
     return self.alienWins
 end
     
-function GameInfo:SetIsGatherReady(isGatherReady)
-    self.isGatherReady = isGatherReady
-end
-
 function GameInfo:GetRookieMode()
     return self.rookieMode
 end
@@ -340,6 +336,7 @@ if Server then
 
     function GameInfo:SetRookieMode(mode)
         self.rookieMode = mode
+    end
 
     function GameInfo:SetRookieMode(mode)
         self.rookieMode = mode

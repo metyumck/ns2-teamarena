@@ -265,9 +265,7 @@ function Team:TriggerEffects(eventName)
     self:ForEachPlayer(TriggerEffects)
 end
 
---[[
-McG: Removed as this functionality is only used when round is in CountDown state.
-It is also duplicate functionality of PLayer:OnProcessMove.
+
 function Team:SetFrozenState(state)
     local SetFrozen = Closure [=[
         self state
@@ -276,7 +274,6 @@ function Team:SetFrozenState(state)
     ]=]{state}
     self:ForEachPlayer(SetFrozen)
 end
---]]
 
 function Team:SetAutoTeamBalanceEnabled(enabled, unbalanceAmount)
 

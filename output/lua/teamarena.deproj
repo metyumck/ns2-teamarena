@@ -16,6 +16,9 @@
     <filename>Balance.lua</filename>
   </file>
   <file>
+    <filename>BalanceMisc.lua</filename>
+  </file>
+  <file>
     <filename>CommandStructure.lua</filename>
   </file>
   <file>

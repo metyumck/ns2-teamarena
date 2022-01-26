@@ -516,8 +516,6 @@ function MarineTeam:InitTechTree()
     
     -- Commander abilities
     self.techTree:AddResearchNode(kTechId.AdvancedMarineSupport)
-    self.techTree:AddResearchNode(kTechId.NanoShieldTech)
-    self.techTree:AddResearchNode(kTechId.CatPackTech)
     
     self.techTree:AddTargetedActivation(kTechId.NanoShield,       kTechId.AdvancedMarineSupport)
     self.techTree:AddTargetedActivation(kTechId.Scan,             kTechId.Observatory)

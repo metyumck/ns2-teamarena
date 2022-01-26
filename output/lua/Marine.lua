@@ -170,13 +170,11 @@ AddMixinNetworkVars(CameraHolderMixin, networkVars)
 AddMixinNetworkVars(SelectableMixin, networkVars)
 AddMixinNetworkVars(StunMixin, networkVars)
 AddMixinNetworkVars(NanoShieldMixin, networkVars)
-AddMixinNetworkVars(NanoShieldMixin, networkVars)
 AddMixinNetworkVars(FireMixin, networkVars)
 AddMixinNetworkVars(CatPackMixin, networkVars)
 AddMixinNetworkVars(SprintMixin, networkVars)
 AddMixinNetworkVars(OrderSelfMixin, networkVars)
 AddMixinNetworkVars(DissolveMixin, networkVars)
-AddMixinNetworkVars(VortexAbleMixin, networkVars)
 AddMixinNetworkVars(LOSMixin, networkVars)
 AddMixinNetworkVars(CombatMixin, networkVars)
 AddMixinNetworkVars(ParasiteMixin, networkVars)
@@ -199,7 +197,6 @@ function Marine:OnCreate()
     InitMixin(self, CameraHolderMixin, { kFov = kDefaultFov })
     InitMixin(self, MarineActionFinderMixin)
     InitMixin(self, ScoringMixin, { kMaxScore = kMaxScore })
-    InitMixin(self, VortexAbleMixin)
     InitMixin(self, CombatMixin)
     InitMixin(self, SelectableMixin)
     
@@ -282,6 +279,7 @@ function Marine:GetCanJump()
 end
 
 function Marine:InitTechTree()
+ 
     if Server and self:GetTeamType() == 1 then
         self.techTree = TechTree()
         self.techTree:CopyDataFrom(self:GetTeam():GetTechTree())
@@ -378,7 +376,6 @@ function Marine:OnInitialized()
         self:AddHelpWidget("GUIMapHelp", 1)
         self:AddHelpWidget("GUITunnelEntranceHelp", 1)
         
-        self.notifications = { }
         self.timeLastSpitHitEffect = 0
         
     end
@@ -406,7 +403,7 @@ function Marine:UpdateTechTree()
 
         --self.techTree:Update(self.entityTechIds, self.techIdCount)
         
-        /*
+        --[[
         local techTreeString = ""        
         for _, techId in ipairs(self.entityTechIds) do            
             techTreeString = techTreeString .. " " .. EnumToString(kTechId, techId) .. "(" .. ToString(self.techIdCount[techId]) .. ")"            
@@ -414,7 +411,7 @@ function Marine:UpdateTechTree()
         Print("-----------team nr %s", ToString(self:GetTeamNumber()))
         Print(techTreeString)
         Print("------------------------")
-        */
+        ]]--
 
         -- Send tech tree base line to players that just switched teams or joined the game        
         
@@ -446,7 +443,7 @@ end
 function Marine:GetArmorLevel()
 
     local armorLevel = 1
-    local techTree = self.techTree
+    local techTree = self:GetTechTree()
  
     if techTree then
     
@@ -471,7 +468,7 @@ end
 function Marine:GetWeaponLevel()
 
     local weaponLevel = 1
-    local techTree = self.techTree
+    local techTree = self:GetTechTree()
 
     if techTree then
         

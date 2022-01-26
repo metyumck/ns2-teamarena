@@ -465,8 +465,7 @@ function Player:OnInitialized()
         --self:InitTechTree()
         
         
-        self:SetName(kDefaultPlayerName)
-        
+    
         self:SetNextThink(Player.kThinkInterval)
         
         InitMixin(self, MobileTargetMixin)
@@ -1466,7 +1465,7 @@ end
 
 function Player:OnProcessIntermediate(input)
    
-    if self:GetIsAlive() and not self.countingDown then
+    if self:GetIsAlive() and not self:GetCountdownActive() then
         -- Update to the current view angles so that the mouse feels smooth and responsive.
         self:UpdateViewAngles(input)
     end
@@ -2088,9 +2087,16 @@ function Player:HandleButtons(input)
     end
     
     self.moveButtonPressed = input.move:GetLength() ~= 0
-    
+
     local ableToUse = self:GetIsAbleToUse()
-    if ableToUse and bit.band(input.commands, Move.Use) ~= 0 and not self.primaryAttackLastFrame and not self.secondaryAttackLastFrame then
+    local attackLastFrame = self.primaryAttackLastFrame or self.secondaryAttackLastFrame or self.tertiaryAttackLastFrame
+    local alienSecondaryAttacking = self:isa("Alien") and self.secondaryAttackLastFrame
+
+    -- The only use case so far for the 'use' key to be pressed while using primary/secondary attack is
+    -- as a gorge when you heal yourself and want to press 'use' to hatch a babblerEgg, or an alien entering the hive.
+    -- Otherwise this is disable to prevent issues when opening any buy menu as a marine and the weapon keep firing/reloading
+    -- unless you leave the menu. Which can cause issues if you got a GL. The marine player can just release the key and press use.
+    if ableToUse and bit.band(input.commands, Move.Use) ~= 0 and (not attackLastFrame or alienSecondaryAttacking) then
         AttemptToUse(self, input.time)
     end
     
@@ -2361,20 +2367,19 @@ function Player:GetDarwinMode()
 end
 
 function Player:OnSighted(sighted)
-
-    if self.GetActiveWeapon then
-    
-        local weapon = self:GetActiveWeapon()
-        if weapon ~= nil then
-            weapon:SetRelevancy(sighted)
-        end
-        
-    end
-    
 end
 
 function Player:GetGameStarted()
-    return self.gameStarted
+    local gameInfoEnt = GetGameInfoEntity()
+    if not gameInfoEnt then
+        return false
+    end
+
+    if GetWarmupActive() and not self:isa("Commander") then
+        return true
+    end
+
+    return gameInfoEnt:GetGameStarted()
 end
 
 function Player:GetCountdownActive()

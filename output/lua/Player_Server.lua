@@ -496,9 +496,7 @@ function Player:CopyPlayerDataFrom(player)
     -- Copy network data over because it won't be necessarily be resent
     self.resources = player.resources
     self.teamResources = player.teamResources
-    self.gameStarted = player.gameStarted
-    self.countingDown = player.countingDown
-    self.frozen = player.frozen
+    --self.frozen = player.frozen
     
     self.timeOfDeath = player.timeOfDeath
     self.timeOfLastUse = player.timeOfLastUse
