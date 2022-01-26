@@ -11,7 +11,7 @@ Script.Load("lua/Weapons/ClientWeaponEffectsMixin.lua")
 
 class 'RailPistol' (ClipWeapon)
 
-RailPistol.kMapName = "railpistol"`
+RailPistol.kMapName = "railpistol"
 
 local kModelName = PrecacheAsset("models/marine/welder/builder.model")
 local kViewModels = GenerateMarineViewModelPaths("welder")

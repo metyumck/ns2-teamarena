@@ -112,6 +112,20 @@ function TechTree:SendTechTreeUpdates(playerList)
     
 end
 
+function TechTree:SendTechTreeUpdateToPlayer(player)
+
+    for techNodeIndex, techNode in ipairs(self.techNodesChanged) do
+    
+        local techNodeUpdateTable = BuildTechNodeUpdateMessage(techNode)
+           
+        Server.SendNetworkMessage(player, "TechNodeUpdate", techNodeUpdateTable, true)
+               
+    end
+    
+    table.clear(self.techNodesChanged)
+    
+end
+
 function TechTree:AddOrder(techId)
 
     local techNode = TechNode()

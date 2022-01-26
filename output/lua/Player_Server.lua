@@ -428,10 +428,11 @@ function Player:OnUpdatePlayer(deltaTime)
     
     local gamerules = GetGamerules()
     self.gameStarted = gamerules:GetGameStarted()
- 
+
     if self:GetTeamNumber() == kTeam1Index or self:GetTeamNumber() == kTeam2Index then
         self.countingDown = gamerules:GetCountingDown()
         self.gameBuytime = gamerules:GetBuyTime()
+        print(ToString(self.gameBuytime))
     else
         self.countingDown = false
         self.gameBuytime = false
@@ -496,7 +497,7 @@ function Player:CopyPlayerDataFrom(player)
     -- Copy network data over because it won't be necessarily be resent
     self.resources = player.resources
     self.teamResources = player.teamResources
-    --self.frozen = player.frozen
+    self.frozen = player.frozen
     
     self.timeOfDeath = player.timeOfDeath
     self.timeOfLastUse = player.timeOfLastUse

@@ -1220,16 +1220,16 @@ function Player:AdjustMove(input)
     -- Don't allow movement when frozen in place
     --McG: Remove as frozen state can get out of sync depending on when players join a team
     --the desired effect of frozen flag is already dealt with in Player:OnProcessMove() anyways, this is pointless.
-    --if self.frozen then
-    --    input.move:Scale(0)
-    --else
+    if self.frozen then
+       input.move:Scale(0)
+    else
 
-    -- Allow child classes to affect how much input is allowed at any time
-    if self.mode == kPlayerMode.Taunt then
-        input.move:Scale(Player.kTauntMovementScalar)
+        -- Allow child classes to affect how much input is allowed at any time
+        if self.mode == kPlayerMode.Taunt then
+            input.move:Scale(Player.kTauntMovementScalar)
+        end
+
     end
-
-    --end
     
     return input
     
@@ -1518,6 +1518,9 @@ end
 -- compensated fields are rolled back in time, so it needs to restore them once the processing
 -- is done. So it backs up, synchs to the old state, runs the OnProcessMove(), then restores them. 
 function Player:OnProcessMove(input)
+    if self.frozen then
+        input.move:Scale(0)
+    end
 
     -- ensure that a player is always moving itself using full precision
     self:SetOrigin(self.fullPrecisionOrigin)
@@ -2101,11 +2104,13 @@ function Player:HandleButtons(input)
     end
     
     if Client and not Shared.GetIsRunningPrediction() then
+
     
         self.buyLastFrame = self.buyLastFrame or false
         -- Player is bringing up the buy menu (don't toggle it too quickly)
         local buyButtonPressed = bit.band(input.commands, Move.Buy) ~= 0
         if not self.buyLastFrame and buyButtonPressed and Shared.GetTime() > (self.timeLastMenu + 0.3) and Client.GetLocalPlayer():GetGameBuyTime() then
+            print('Attempting to open 2')
             if Client.GetLocalPlayer():GetTeamNumber() == 2 then   
                 self:Buy()
             end
@@ -2390,6 +2395,8 @@ function Player:GetCountdownActive()
 
     return self:GetIsOnPlayingTeam() and gameInfoEnt:GetCountdownActive()
 end
+
+
 
 function Player:GetGameBuyTime()
     return self.gameBuytime

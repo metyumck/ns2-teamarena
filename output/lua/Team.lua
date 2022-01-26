@@ -266,12 +266,12 @@ function Team:TriggerEffects(eventName)
 end
 
 
-function Team:SetFrozenState(state)
+function Team:SetFrozenState(frozen)
     local SetFrozen = Closure [=[
-        self state
+        self frozen
         args player
-        player.state = state
-    ]=]{state}
+        player.frozen = frozen
+    ]=]{frozen}
     self:ForEachPlayer(SetFrozen)
 end
 

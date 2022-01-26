@@ -362,6 +362,7 @@ end
 
 -- Bring up buy menu
 function Marine:BuyMenu()
+    
 
     -- Don't allow display in the ready room
     if self:GetTeamNumber() ~= 0 and Client.GetLocalPlayer() == self then
